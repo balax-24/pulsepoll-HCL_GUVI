@@ -1,0 +1,39 @@
+services:
+  pulsepoll-mongo:
+    image: mongo:7.0
+    container_name: pulsepoll-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: pulsepoll
+    volumes:
+      - pulsepoll_mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  pulsepoll-redis:
+    image: redis:7-alpine
+    container_name: pulsepoll-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - pulsepoll_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 2s
+
+volumes:
+  pulsepoll_mongodb_data:
+    name: pulsepoll_mongodb_data
+  pulsepoll_redis_data:
+    name: pulsepoll_redis_data
