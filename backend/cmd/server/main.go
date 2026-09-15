@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"pulsepoll/backend/internal/auth"
 	"pulsepoll/backend/internal/config"
 	"pulsepoll/backend/internal/database/mongodb"
 	"pulsepoll/backend/internal/database/redis"
@@ -60,8 +61,23 @@ func main() {
 	}
 	slog.Info("Redis connection established and verified")
 
+	// Initialize User repository and ensure indexes
+	userRepo := auth.NewMongoUserRepository(mongoClient.Database())
+	if err := userRepo.EnsureIndexes(mongoCtx); err != nil {
+		slog.Error("Failed to ensure user collection indexes", slog.String("error", err.Error()))
+		_ = redisClient.Close()
+		_ = mongoClient.Close(context.Background())
+		os.Exit(1)
+	}
+	slog.Info("MongoDB user indexes verified")
+
+	// Initialize JWT manager, service, and HTTP handler
+	jwtMgr := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiryHours)
+	authService := auth.NewService(userRepo, jwtMgr)
+	authHandler := auth.NewHandler(authService)
+
 	// Set up router and HTTP server
-	router := server.SetupRouter(cfg, mongoClient, redisClient)
+	router := server.SetupRouter(cfg, mongoClient, redisClient, authHandler, jwtMgr)
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),
 		Handler:      router,
@@ -89,7 +105,7 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
-	// 1. Shutdown HTTP server (stops accepting new connections, drains existing ones)
+	// 1. Shutdown HTTP server (drains in-flight requests)
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		slog.Error("Error during HTTP server shutdown", slog.String("error", err.Error()))
 	} else {

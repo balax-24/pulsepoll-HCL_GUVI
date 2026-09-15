@@ -114,3 +114,24 @@ Response:
   }
 }
 ```
+
+---
+
+## 5. Authentication API & Security
+
+PulsePoll implements secure, state-free authentication using **bcrypt (cost 10)** for password hashing and signed **JWT (HMAC-SHA256)** for request authorization.
+
+### Endpoints
+
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | No | Registers new account; enforces unique normalized email & minimum 8-char password |
+| `POST` | `/api/auth/login` | No | Validates credentials; returns signed JWT and safe user profile DTO |
+| `GET` | `/api/auth/me` | Yes (`Bearer <token>`) | Retrieves safe profile information for the authenticated user |
+
+### Security Measures
+1. **Password Hashing:** Passwords are hashed with bcrypt before storage; plaintext passwords and hashes are never returned to clients or logged.
+2. **Email Normalization:** Emails are converted to lowercase and trimmed before uniqueness checks, preventing case-manipulation duplicates (`User@Pulse.io` vs `user@pulse.io`).
+3. **Timing-Safe Generic Errors:** Login returns a generic `401 Unauthorized` (`Invalid email or password`) to eliminate account enumeration vulnerabilities.
+4. **JWT Hardening:** Tokens include standard `iss`, `sub`, `iat`, and `exp` claims with strict signature validation against the HMAC algorithm, preventing `alg: none` exploits.
+
