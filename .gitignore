@@ -28,14 +28,15 @@ pnpm-debug.log*
 # Environment and Secrets (ALLOW .env.example)
 .env
 .env.*
+*.env
+*-credentials.env
 !.env.example
 !*.env.example
+!**/.env.example
 backend/.env
 backend/.env.*
-!backend/.env.example
 frontend/.env
 frontend/.env.*
-!frontend/.env.example
 
 # IDE and Editor artifacts
 .idea/
