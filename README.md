@@ -191,3 +191,93 @@ Audiences access polls via `GET /api/polls/:id` without authentication. The retu
 * **`active`**: Poll is open and accepting audience interactions.
 * **`closed`**: Poll is closed to further modifications and votes. Public audience can still view the question, options, and closed status.
 * **Soft Deletion**: Deletion sets `is_deleted: true` and records `deleted_at`. Deleted polls immediately return `404 Not Found` for audience and creator queries, but retain document and option records in MongoDB to ensure future vote audit trails are never orphaned.
+
+---
+
+## 7. Voting & Realtime Counters (Phase 6)
+
+PulsePoll features a concurrency-safe, dual-layer voting system combining durable audit records in MongoDB with high-throughput atomic live counters in Redis.
+
+### Vote Data Model (MongoDB)
+
+Audience votes are recorded as compact documents in the `votes` collection, avoiding denormalization of entire poll documents:
+
+```json
+{
+  "_id": ObjectId("6aa9ed250cf658f70a932a88"),
+  "poll_id": "6aa9ed250cf658f70a932a87",
+  "option_id": "6aa9ed250cf658f70a932a84",
+  "voter_id": "9be105f2ec74d293a2a62ba8f97706c6",
+  "created_at": ISODate("2026-09-16T01:13:09.181Z")
+}
+```
+
+### Redis Live Counters
+
+Live vote counting is executed entirely in-memory using Redis Hashes for immediate reads and atomic increments:
+
+* **Key Schema**: `poll:{pollID}:votes`
+* **Fields**: `{optionID} -> {count}`
+* **Atomic Mutation**: Increments are performed strictly via `HINCRBY poll:{pollID}:votes {optionID} 1` (preventing read-modify-write lost updates).
+
+```
+redis-cli HGETALL poll:6aa9ed250cf658f70a932a87:votes
+1) "6aa9ed250cf658f70a932a84"
+2) "1"
+3) "6aa9ed250cf658f70a932a85"
+4) "1"
+5) "6aa9ed250cf658f70a932a86"
+6) "0"
+```
+
+### Anonymous Voter Identification & Duplicate Prevention
+
+1. **Session Resolution**: Audience participants are tracked using a cryptographically random 128-bit session token generated server-side.
+2. **Persistence Mechanisms**:
+   * Stored in an `HttpOnly`, `SameSite=Lax` cookie (`pulsepoll_voter_id`).
+   * Supported via `X-Voter-ID` request/response headers for programmatic clients and tests.
+3. **Database Concurrency Barrier**:
+   * MongoDB enforces a unique compound index on `(poll_id, voter_id)`.
+   * Concurrent requests from the same session race at the database layer; only one insert succeeds, while subsequent attempts are rejected with `409 Conflict` (`DUPLICATE_VOTE`).
+
+### MongoDB & Redis Consistency Strategy
+
+* **Persistence Order**: MongoDB durable persistence occurs **first**. If MongoDB rejects the vote (due to duplicate key, database validation, or failure), Redis is never touched.
+* **Atomic Increment**: Redis `HINCRBY` is invoked only upon verified MongoDB insertion. If an intermittent network error occurs, exponential backoff retries are attempted.
+* **Crash Recovery & Reconciliation**: Redis is an ephemeral live-count cache, while MongoDB remains the durable source of truth. If Redis restarts or drops keys, the service detects the missing hash and idempotently reconstructs the counters directly from MongoDB aggregation pipelines using `HSETNX`.
+
+### Endpoints
+
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/polls/:id/vote` | No (Audience) | Submits a vote; generates/validates voter session; persists to MongoDB; increments Redis live count |
+| `GET` | `/api/polls/:id/results` | No (Audience) | Returns real-time vote tallies and computed percentages from Redis live counters |
+
+### Live Results Envelope
+
+```json
+{
+  "poll_id": "6aa9ed250cf658f70a932a87",
+  "total_votes": 2,
+  "results": [
+    {
+      "option_id": "6aa9ed250cf658f70a932a84",
+      "text": "Redis",
+      "votes": 1,
+      "percentage": 50.0
+    },
+    {
+      "option_id": "6aa9ed250cf658f70a932a85",
+      "text": "Memcached",
+      "votes": 1,
+      "percentage": 50.0
+    },
+    {
+      "option_id": "6aa9ed250cf658f70a932a86",
+      "text": "Dragonfly",
+      "votes": 0,
+      "percentage": 0.0
+    }
+  ]
+}
+```

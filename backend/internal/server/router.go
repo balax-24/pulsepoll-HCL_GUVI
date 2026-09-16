@@ -11,6 +11,7 @@ import (
 	"pulsepoll/backend/internal/middleware"
 	"pulsepoll/backend/internal/polls"
 	"pulsepoll/backend/internal/response"
+	"pulsepoll/backend/internal/votes"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,6 +23,7 @@ func SetupRouter(
 	redisClient *redis.Client,
 	authHandler *auth.Handler,
 	pollHandler *polls.Handler,
+	voteHandler *votes.Handler,
 	jwtMgr *auth.JWTManager,
 ) *gin.Engine {
 	if cfg.IsProduction() {
@@ -68,8 +70,10 @@ func SetupRouter(
 		// Polls group
 		pollsGroup := api.Group("/polls")
 		{
-			// Public audience endpoint: GET /api/polls/:id
+			// Public audience endpoints: GET poll, GET results, POST vote
 			pollsGroup.GET("/:id", pollHandler.GetPublic)
+			pollsGroup.GET("/:id/results", voteHandler.GetResults)
+			pollsGroup.POST("/:id/vote", voteHandler.CastVote)
 
 			// Protected creator management endpoints
 			protected := pollsGroup.Group("")
