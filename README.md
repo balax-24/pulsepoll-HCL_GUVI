@@ -403,3 +403,115 @@ To prevent unbounded resource consumption from thousands of idle polls:
 * **Execution Order**: MongoDB persistence **always** precedes Redis mutation, which **always** precedes Redis Pub/Sub publishing.
 * **Failed Votes Never Broadcast**: If a vote is rejected (e.g. duplicate voter session, closed poll, database error), Redis `HINCRBY` and Pub/Sub are never invoked.
 * **Best-Effort Delivery**: If Redis Pub/Sub publishing encounters a network glitch after `HINCRBY` succeeds, the vote is **not** rolled back. The MongoDB vote record and Redis count remain durable and authoritative. The error is logged, and clients reconcile upon reconnection or results refresh.
+
+---
+
+## 9. Phase 8 — React Frontend & Complete User Experience
+
+PulsePoll provides a modern, responsive single-page web interface built with **React 19**, **Vite**, and vanilla CSS design tokens. It integrates directly with the Go/Gin backend and Redis Pub/Sub WebSocket streaming infrastructure without any mock data or polling intervals.
+
+### Frontend Architecture & Structure
+
+```
+frontend/
+├── src/
+│   ├── api/
+│   │   ├── client.js               # Centralized fetch wrapper with JWT bearer injection and error normalization
+│   │   ├── auth.js                 # Authentication API calls (register, login, getMe)
+│   │   ├── polls.js                # Poll management API calls (create, getPublic, getMy, update, close, delete)
+│   │   └── votes.js                # Voting and results API calls (castVote, getResults)
+│   ├── components/
+│   │   ├── Alert.jsx               # Accessible dismissible notification banner
+│   │   ├── Footer.jsx              # Application branding and technology stack footer
+│   │   ├── LiveBadge.jsx           # Pulsing connection status badge (Connected, Connecting, Reconnecting, Offline)
+│   │   ├── Navbar.jsx              # Brand header with dynamic session state and navigation
+│   │   ├── PollCard.jsx            # Creator poll dashboard card with one-click copy link & actions
+│   │   ├── PollResults.jsx         # Live results display with animated progress bars & leading badges
+│   │   └── ProtectedRoute.jsx      # Authentication route guard with session restoration
+│   ├── context/
+│   │   └── AuthContext.jsx         # React context provider with /api/auth/me startup verification
+│   ├── hooks/
+│   │   └── usePollWebSocket.js     # Robust WebSocket hook with bounded exponential backoff & cleanup
+│   ├── pages/
+│   │   ├── HomePage.jsx            # Architectural landing page with feature breakdowns
+│   │   ├── LoginPage.jsx           # Creator sign-in form with client validation and redirect
+│   │   ├── RegisterPage.jsx        # Creator account registration with auto-login
+│   │   ├── DashboardPage.jsx       # Authenticated poll dashboard with metrics, filters, and cards
+│   │   ├── CreatePollPage.jsx      # Dynamic poll builder (2–10 options) with copyable shareable link
+│   │   ├── PublicPollPage.jsx      # Public audience voting screen & real-time WebSocket live results
+│   │   └── ManagePollPage.jsx      # Creator poll management console (close, delete, update question)
+│   ├── test/
+│   │   ├── setup.js                # Vitest / testing-library jest-dom configuration
+│   │   ├── auth.test.jsx           # Unit tests for login, registration, and route guarding
+│   │   ├── poll_form.test.jsx      # Unit tests for poll form validation & dynamic options
+│   │   ├── poll_results.test.jsx   # Unit tests for results rendering, percentages, and progress bars
+│   │   └── public_poll_websocket.test.jsx # Integration tests for voting, duplicates, and WebSocket events
+│   ├── App.jsx                     # Route definitions (public and protected)
+│   ├── index.css                   # Polished dark-mode design system with smooth animations
+│   └── main.jsx                    # React entrypoint
+├── .env.example                    # Frontend environment variable reference
+├── package.json                    # Dependencies and scripts
+└── vite.config.js                  # Vite bundler and Vitest test runner configuration
+```
+
+### Route Table
+
+| Route | Access | Purpose |
+| :--- | :--- | :--- |
+| `/` | Public | Landing page with architecture diagram and get-started CTAs |
+| `/login` | Public | Creator sign-in page with validation and session restore |
+| `/register` | Public | Creator account registration with auto-login into dashboard |
+| `/polls/:id` | **Public** | **Public poll participation**: radio voting + live animated results (No auth required) |
+| `/dashboard` | Protected | Creator dashboard listing all created polls, metrics, and filters |
+| `/polls/create` | Protected | Poll creation form (2 to 10 options, optional deadline) |
+| `/polls/:id/manage` | Protected | Creator management console to close, delete, or edit poll |
+
+### Environment Variables
+
+Defined in `frontend/.env`:
+```bash
+VITE_API_BASE_URL=http://localhost:8080
+VITE_API_URL=http://localhost:8080/api
+VITE_WS_URL=ws://localhost:8080/api
+```
+
+### How to Run Frontend
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start local development server (http://localhost:5173)
+npm run dev
+
+# Run unit and component test suite
+npm run test
+
+# Run linter
+npm run lint
+
+# Build production bundle
+npm run build
+```
+
+### Public Poll Flow & Realtime Results
+
+1. **Unauthenticated Public Access**: Audience members navigate to `/polls/:id`. No signup or login is required.
+2. **Initial State Reconciliation**: On component mount, the frontend fetches `GET /api/polls/:id` and `GET /api/polls/:id/results` via REST to display initial question and baseline tallies.
+3. **Realtime WebSocket Connection**: The custom hook `usePollWebSocket` opens `ws://localhost:8080/api/polls/:id/ws`:
+   * Automatically replaces state upon receiving `results_snapshot`.
+   * Directly updates individual option counts and total votes upon receiving `vote_update` frames.
+   * Smoothly animates progress bars via CSS transitions (`transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1)`).
+   * **Zero Polling Loops**: No `setInterval` or repeated REST polling is ever used.
+4. **Resilient Reconnection**:
+   * If the WebSocket connection drops, status transitions to `reconnecting` and an exponential backoff reconnect is attempted (1s, 2s, 4s, bounded at 10s).
+   * Upon reconnection, the fresh `results_snapshot` reconciles any votes cast while offline.
+   * Safe for React 19 / StrictMode dual mounting (aborts stale sockets and cleans up event handlers).
+5. **Voting UX & Duplicate Protection**:
+   * Audience members select a radio button and submit their vote.
+   * Browser stores anonymous voter session tokens (`localStorage` and HTTP cookie).
+   * Duplicate submissions are rejected with HTTP 409 `DUPLICATE_VOTE` and display a friendly message: *"You've already voted in this poll."*
+   * When a creator closes a poll, a `poll_closed` frame is broadcast over WebSockets, instantly locking further voting across all screens.
