@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Alert } from '../components/Alert.jsx'
+import { IconActivity, IconEye, IconEyeOff } from '../components/Icons.jsx'
 
 export function RegisterPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -54,22 +56,10 @@ export function RegisterPage() {
   return (
     <div className="auth-page-container">
       <div className="auth-card">
+        {/* Top Branding & Header */}
         <div className="auth-header">
-          <div className="auth-icon-badge">
-            <svg
-              className="auth-header-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="8.5" cy="7" r="4" />
-              <line x1="20" y1="8" x2="20" y2="14" />
-              <line x1="23" y1="11" x2="17" y2="11" />
-            </svg>
+          <div className="auth-brand-badge">
+            <IconActivity size={20} className="auth-pulse-icon" />
           </div>
           <h1 className="auth-title">Create Account</h1>
           <p className="auth-subtitle">Start creating live, interactive polls in seconds</p>
@@ -112,7 +102,7 @@ export function RegisterPage() {
               className="form-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="alex@example.com"
+              placeholder="alex@company.com"
               required
               autoComplete="email"
               disabled={isSubmitting}
@@ -123,23 +113,35 @@ export function RegisterPage() {
             <label htmlFor="register-password" className="form-label">
               Password
             </label>
-            <input
-              id="register-password"
-              type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
-              required
-              autoComplete="new-password"
-              disabled={isSubmitting}
-            />
+            <div className="password-input-wrapper">
+              <input
+                id="register-password"
+                type={showPassword ? 'text' : 'password'}
+                className="form-input password-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                required
+                autoComplete="new-password"
+                disabled={isSubmitting}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide visibility' : 'Show visibility'}
+                title={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+              </button>
+            </div>
             <span className="input-hint">Minimum 8 characters with at least one letter</span>
           </div>
 
           <button
             type="submit"
-            className="btn btn-primary btn-block"
+            className="btn btn-primary btn-block btn-auth-submit"
             disabled={isSubmitting}
           >
             {isSubmitting ? (

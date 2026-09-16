@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom'
 import { getMyPolls, deletePoll } from '../api/polls.js'
 import { PollCard } from '../components/PollCard.jsx'
 import { Alert } from '../components/Alert.jsx'
+import { IconPlus, IconRefresh, IconBarChart, IconActivity } from '../components/Icons.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 
 export function DashboardPage() {
+  const { user } = useAuth()
   const [polls, setPolls] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -31,7 +34,7 @@ export function DashboardPage() {
   }, [fetchPolls])
 
   const handleDelete = async (pollId) => {
-    if (!window.confirm('Are you sure you want to delete this poll? Public viewers will no longer be able to access it.')) {
+    if (!window.confirm('Are you sure you want to delete this poll? Public viewers will immediately receive a 404.')) {
       return
     }
 
@@ -57,14 +60,24 @@ export function DashboardPage() {
 
   return (
     <div className="dashboard-container">
+      {/* Workspace Header */}
       <div className="dashboard-header">
         <div className="dashboard-title-group">
-          <h1 className="dashboard-title">Creator Dashboard</h1>
-          <p className="dashboard-subtitle">Monitor real-time participation and manage your polls</p>
+          <div className="dashboard-pretitle">
+            <span className="dashboard-status-dot" />
+            <span>Workspace</span>
+          </div>
+          <h1 className="dashboard-title">
+            {user?.name ? `${user.name}'s Polls` : 'Creator Dashboard'}
+          </h1>
+          <p className="dashboard-subtitle">
+            Create questions, distribute shareable links, and monitor live responses.
+          </p>
         </div>
         <div className="dashboard-actions">
-          <Link to="/polls/create" className="btn btn-primary">
-            <span className="btn-icon">+</span> Create Poll
+          <Link to="/polls/create" className="btn btn-primary create-poll-cta">
+            <IconPlus size={16} />
+            <span>Create Poll</span>
           </Link>
         </div>
       </div>
@@ -90,25 +103,36 @@ export function DashboardPage() {
       {/* Metrics Row */}
       <div className="metrics-grid">
         <div className="metric-card">
-          <span className="metric-label">Total Created</span>
+          <div className="metric-header-row">
+            <span className="metric-label">Total Polls</span>
+            <IconBarChart size={16} className="text-muted" />
+          </div>
           <span className="metric-value">{loading ? '—' : totalCount}</span>
-          <span className="metric-subtext">Polls in your account</span>
+          <span className="metric-subtext">Registered in your account</span>
         </div>
+
         <div className="metric-card metric-card-active">
-          <span className="metric-label">Active Polls</span>
+          <div className="metric-header-row">
+            <span className="metric-label">Active Polls</span>
+            <IconActivity size={16} className="text-emerald" />
+          </div>
           <span className="metric-value text-emerald">{loading ? '—' : activePollsCount}</span>
-          <span className="metric-subtext">Accepting live responses</span>
+          <span className="metric-subtext">Currently receiving responses</span>
         </div>
+
         <div className="metric-card metric-card-closed">
-          <span className="metric-label">Closed Polls</span>
+          <div className="metric-header-row">
+            <span className="metric-label">Closed Polls</span>
+            <span className="badge-dot dot-gray" />
+          </div>
           <span className="metric-value text-muted">{loading ? '—' : closedPollsCount}</span>
           <span className="metric-subtext">Archived / final results</span>
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs & Refresh Bar */}
       <div className="dashboard-filter-bar">
-        <div className="filter-tabs" role="tablist">
+        <div className="filter-tabs" role="tablist" aria-label="Poll Status Filter">
           <button
             type="button"
             className={`filter-tab ${filter === 'all' ? 'active' : ''}`}
@@ -116,7 +140,7 @@ export function DashboardPage() {
             role="tab"
             aria-selected={filter === 'all'}
           >
-            All Polls ({polls.length})
+            All Polls <span className="tab-badge">{polls.length}</span>
           </button>
           <button
             type="button"
@@ -125,7 +149,7 @@ export function DashboardPage() {
             role="tab"
             aria-selected={filter === 'active'}
           >
-            Active ({activePollsCount})
+            Active <span className="tab-badge">{activePollsCount}</span>
           </button>
           <button
             type="button"
@@ -134,7 +158,7 @@ export function DashboardPage() {
             role="tab"
             aria-selected={filter === 'closed'}
           >
-            Closed ({closedPollsCount})
+            Closed <span className="tab-badge">{closedPollsCount}</span>
           </button>
         </div>
 
@@ -144,8 +168,10 @@ export function DashboardPage() {
           onClick={fetchPolls}
           disabled={loading}
           title="Reload polls list"
+          aria-label="Refresh poll list"
         >
-          ↻ Refresh
+          <IconRefresh size={14} className={loading ? 'animate-spin' : ''} />
+          <span>Refresh</span>
         </button>
       </div>
 
@@ -153,26 +179,29 @@ export function DashboardPage() {
       {loading ? (
         <div className="polls-loading-state" aria-label="Loading polls">
           <div className="loading-spinner" />
-          <p className="loading-text">Loading your polls...</p>
+          <p className="loading-text">Fetching your live polls...</p>
         </div>
       ) : filteredPolls.length === 0 ? (
         <div className="polls-empty-state">
-          <div className="empty-state-icon">📊</div>
+          <div className="empty-state-icon-wrapper">
+            <IconBarChart size={32} className="empty-icon text-muted" />
+          </div>
           {filter === 'all' ? (
             <>
-              <h2 className="empty-state-title">You haven't created any polls yet.</h2>
+              <h2 className="empty-state-title">No polls yet</h2>
               <p className="empty-state-desc">
-                Engage your audience with live questions and watch instant responses roll in in real-time.
+                Create your first poll and start collecting responses in real time.
               </p>
-              <Link to="/polls/create" className="btn btn-primary btn-lg">
-                Create Your First Poll
+              <Link to="/polls/create" className="btn btn-primary btn-empty-cta">
+                <IconPlus size={16} />
+                <span>Create Poll</span>
               </Link>
             </>
           ) : (
             <>
-              <h2 className="empty-state-title">No {filter} polls found.</h2>
+              <h2 className="empty-state-title">No {filter} polls found</h2>
               <p className="empty-state-desc">
-                Try switching filters to view all your polls.
+                There are no polls currently matching the "{filter}" filter.
               </p>
               <button
                 type="button"

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { IconCopy, IconCheck, IconExternalLink, IconEdit, IconTrash } from './Icons.jsx'
 
 export function PollCard({ poll, onDelete }) {
   const [copied, setCopied] = useState(false)
@@ -13,7 +14,6 @@ export function PollCard({ poll, onDelete }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Fallback
       setCopied(false)
     }
   }
@@ -31,9 +31,15 @@ export function PollCard({ poll, onDelete }) {
   return (
     <div className={`poll-card ${isClosed ? 'poll-card-closed' : ''}`}>
       <div className="poll-card-header">
-        <span className={`badge ${isClosed ? 'badge-closed' : 'badge-active'}`}>
-          {isClosed ? 'Closed' : isExpired ? 'Expired' : 'Active'}
-        </span>
+        <div className="poll-card-badge-group">
+          <span className={`badge ${isClosed ? 'badge-closed' : isExpired ? 'badge-expired' : 'badge-active'}`}>
+            <span className="badge-dot" />
+            {isClosed ? 'Closed' : isExpired ? 'Expired' : 'Active'}
+          </span>
+          <span className="options-count-pill">
+            {poll.options?.length || 0} options
+          </span>
+        </div>
         <span className="poll-card-date">{createdDate}</span>
       </div>
 
@@ -43,45 +49,54 @@ export function PollCard({ poll, onDelete }) {
         </Link>
       </h3>
 
-      <div className="poll-card-options-summary">
-        <span className="options-count-pill">
-          {poll.options?.length || 0} options
-        </span>
-      </div>
-
       <div className="poll-card-actions">
         <button
           type="button"
           onClick={handleCopy}
           className="btn btn-sm btn-secondary copy-link-btn"
           title="Copy public link to clipboard"
+          aria-label="Copy public poll link"
         >
-          {copied ? '✓ Copied!' : '📋 Copy Link'}
+          {copied ? (
+            <>
+              <IconCheck size={14} className="text-emerald" />
+              <span>Copied!</span>
+            </>
+          ) : (
+            <>
+              <IconCopy size={14} />
+              <span>Copy Link</span>
+            </>
+          )}
         </button>
 
         <Link
           to={`/polls/${poll.id}`}
           className="btn btn-sm btn-outline"
+          title="Open live public voting view"
         >
-          View Live
+          <IconExternalLink size={14} />
+          <span>View Live</span>
         </Link>
 
         <Link
           to={`/polls/${poll.id}/manage`}
           className="btn btn-sm btn-primary"
+          title="Manage poll settings and closure"
         >
-          Manage
+          <IconEdit size={14} />
+          <span>Manage</span>
         </Link>
 
         {onDelete && (
           <button
             type="button"
             onClick={() => onDelete(poll.id)}
-            className="btn btn-sm btn-ghost btn-remove-option"
-            title="Delete poll"
+            className="btn btn-sm btn-ghost btn-danger-ghost delete-poll-btn"
+            title="Delete this poll"
             aria-label="Delete poll"
           >
-            🗑️
+            <IconTrash size={14} />
           </button>
         )}
       </div>

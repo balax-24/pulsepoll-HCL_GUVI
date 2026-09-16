@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createPoll } from '../api/polls.js'
 import { Alert } from '../components/Alert.jsx'
+import { IconCheckCircle, IconCopy, IconCheck, IconPlus, IconX, IconArrowRight, IconExternalLink } from '../components/Icons.jsx'
 
 export function CreatePollPage() {
   const [question, setQuestion] = useState('')
@@ -125,18 +126,22 @@ export function CreatePollPage() {
       {createdPoll ? (
         /* Success Presentation State */
         <div className="poll-created-success-card">
-          <div className="success-icon-badge">🎉</div>
+          <div className="success-icon-badge">
+            <IconCheckCircle size={32} className="text-emerald" />
+          </div>
           <h1 className="success-title">Poll Created Successfully!</h1>
           <p className="success-subtitle">
-            Your live poll is active and ready to collect real-time responses.
+            Your live poll is ready and accepting real-time responses.
           </p>
 
           <div className="created-poll-summary">
+            <div className="summary-question-label">Active Question</div>
             <h2 className="summary-question">"{createdPoll.question}"</h2>
             <div className="summary-options-list">
               {createdPoll.options?.map((opt, i) => (
                 <span key={opt.id || i} className="summary-option-chip">
-                  {opt.text}
+                  <span className="chip-index">{String(i + 1).padStart(2, '0')}</span>
+                  <span>{opt.text}</span>
                 </span>
               ))}
             </div>
@@ -144,7 +149,7 @@ export function CreatePollPage() {
 
           <div className="share-link-box">
             <label className="share-label" htmlFor="poll-share-link">
-              Shareable Public Link
+              Shareable Audience Link
             </label>
             <div className="share-input-row">
               <input
@@ -158,12 +163,23 @@ export function CreatePollPage() {
                 type="button"
                 onClick={handleCopyLink}
                 className="btn btn-secondary copy-action-btn"
+                aria-label="Copy Link"
               >
-                {copied ? '✓ Link Copied!' : '📋 Copy Link'}
+                {copied ? (
+                  <>
+                    <IconCheck size={16} className="text-emerald" />
+                    <span>✓ Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <IconCopy size={16} />
+                    <span>Copy Link</span>
+                  </>
+                )}
               </button>
             </div>
             <p className="share-hint">
-              Anyone with this link can vote and watch live results without logging in.
+              Anyone with this link can vote anonymously and observe live results without signing up.
             </p>
           </div>
 
@@ -173,7 +189,8 @@ export function CreatePollPage() {
               onClick={() => navigate(`/polls/${createdPoll.id}`)}
               className="btn btn-primary"
             >
-              Open Live Poll →
+              <span>Open Live Poll</span>
+              <IconArrowRight size={16} />
             </button>
             <button
               type="button"
@@ -195,9 +212,10 @@ export function CreatePollPage() {
         /* Poll Creation Form */
         <div className="create-poll-card">
           <div className="create-poll-header">
-            <h1 className="page-heading">Create a New Poll</h1>
+            <div className="header-meta-tag">New Poll</div>
+            <h1 className="page-heading">Create a Live Poll</h1>
             <p className="page-subheading">
-              Define your question and options. Connected viewers see results instantly.
+              Configure your question and answer choices. Connected audiences will view real-time updates.
             </p>
           </div>
 
@@ -214,40 +232,42 @@ export function CreatePollPage() {
             {/* Question Field */}
             <div className="form-group">
               <label htmlFor="poll-question" className="form-label">
-                Poll Question <span className="text-rose">*</span>
+                Poll Question <span className="required-mark">*</span>
               </label>
               <input
                 id="poll-question"
                 type="text"
-                className="form-input"
+                className="form-input form-input-lg"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="e.g. Which web framework should our team adopt?"
+                placeholder="e.g. Which cloud architecture fits our roadmap best?"
                 maxLength={255}
                 required
                 disabled={isSubmitting}
               />
               <div className="input-meta-row">
                 <span className="input-hint">3 to 255 characters</span>
-                <span className="char-count">{question.length}/255</span>
+                <span className="char-count">{question.length} / 255</span>
               </div>
             </div>
 
             {/* Dynamic Options List */}
-            <div className="form-group">
+            <div className="form-group options-group">
               <div className="label-with-badge">
                 <label className="form-label">
-                  Voting Options <span className="text-rose">*</span>
+                  Voting Options <span className="required-mark">*</span>
                 </label>
                 <span className="count-pill">
-                  {options.length}/10 Options
+                  {options.length} of 10 Options
                 </span>
               </div>
 
               <div className="options-input-list">
                 {options.map((opt, index) => (
                   <div key={index} className="option-row">
-                    <span className="option-index-pill">{index + 1}</span>
+                    <span className="option-index-pill">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
                     <input
                       type="text"
                       className="form-input option-input"
@@ -263,12 +283,12 @@ export function CreatePollPage() {
                       <button
                         type="button"
                         onClick={() => handleRemoveOption(index)}
-                        className="btn btn-sm btn-remove-option"
+                        className="btn-remove-option"
                         title="Remove this option"
                         disabled={isSubmitting}
                         aria-label={`Remove option ${index + 1}`}
                       >
-                        ✕
+                        <IconX size={14} />
                       </button>
                     )}
                   </div>
@@ -282,15 +302,16 @@ export function CreatePollPage() {
                   className="btn btn-sm btn-outline add-option-btn"
                   disabled={isSubmitting}
                 >
-                  + Add Option
+                  <IconPlus size={14} />
+                  <span>+ Add Option</span>
                 </button>
               )}
             </div>
 
             {/* Optional Expiration Field */}
-            <div className="form-group">
+            <div className="form-group expiration-group">
               <label htmlFor="poll-expires" className="form-label">
-                Expiration Deadline <span className="text-muted">(Optional)</span>
+                Expiration Deadline <span className="text-muted font-normal">(Optional)</span>
               </label>
               <input
                 id="poll-expires"
@@ -301,7 +322,7 @@ export function CreatePollPage() {
                 disabled={isSubmitting}
               />
               <span className="input-hint">
-                Leave blank for an indefinite poll that closes only when you choose.
+                Leave empty if you wish to keep the poll open until manually closed.
               </span>
             </div>
 

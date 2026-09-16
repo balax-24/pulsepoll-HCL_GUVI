@@ -6,6 +6,7 @@ import { usePollWebSocket } from '../hooks/usePollWebSocket.js'
 import { PollResults } from '../components/PollResults.jsx'
 import { LiveBadge } from '../components/LiveBadge.jsx'
 import { Alert } from '../components/Alert.jsx'
+import { IconCopy, IconCheck, IconCheckCircle, IconAlertTriangle, IconClock } from '../components/Icons.jsx'
 
 export function PublicPollPage() {
   const { id: pollId } = useParams()
@@ -223,7 +224,9 @@ export function PublicPollPage() {
   if (pollError) {
     return (
       <div className="poll-error-card">
-        <div className="error-icon">⚠️</div>
+        <div className="error-icon-wrapper">
+          <IconAlertTriangle size={32} className="text-amber" />
+        </div>
         <h2 className="error-title">Unable to Open Poll</h2>
         <p className="error-desc">{pollError}</p>
         <Link to="/" className="btn btn-primary mt-4">
@@ -244,11 +247,20 @@ export function PublicPollPage() {
           <div className="poll-status-badges">
             <LiveBadge status={wsStatus} />
             {isClosed ? (
-              <span className="badge badge-closed">Closed</span>
+              <span className="badge badge-closed">
+                <span className="badge-dot dot-gray" />
+                <span>Closed</span>
+              </span>
             ) : isExpired ? (
-              <span className="badge badge-expired">Expired</span>
+              <span className="badge badge-expired">
+                <span className="badge-dot dot-amber" />
+                <span>Expired</span>
+              </span>
             ) : (
-              <span className="badge badge-active">Active</span>
+              <span className="badge badge-active">
+                <span className="badge-dot dot-emerald" />
+                <span>Active</span>
+              </span>
             )}
           </div>
 
@@ -258,8 +270,19 @@ export function PublicPollPage() {
               onClick={handleCopyLink}
               className="btn btn-sm btn-secondary copy-btn"
               title="Copy shareable link"
+              aria-label="Copy Link"
             >
-              {copied ? '✓ Link Copied!' : '📋 Copy Link'}
+              {copied ? (
+                <>
+                  <IconCheck size={14} className="text-emerald" />
+                  <span>Link Copied!</span>
+                </>
+              ) : (
+                <>
+                  <IconCopy size={14} />
+                  <span>Copy Link</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -278,14 +301,17 @@ export function PublicPollPage() {
               : 'recently'}
           </span>
           {poll?.expires_at && (
-            <span className="meta-item text-muted">
-              • Deadline:{' '}
-              {new Date(poll.expires_at).toLocaleString(undefined, {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+            <span className="meta-item meta-item-deadline">
+              <IconClock size={12} className="meta-inline-icon" />
+              <span>
+                Deadline:{' '}
+                {new Date(poll.expires_at).toLocaleString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
             </span>
           )}
         </div>
@@ -310,22 +336,37 @@ export function PublicPollPage() {
         />
       )}
 
+      {/* Closed / Expired State Banners */}
+      {isClosed && (
+        <div className="poll-notice-banner banner-closed">
+          <span className="notice-badge">POLL CLOSED</span>
+          <span className="notice-text">This poll is no longer accepting responses. Final results are displayed below.</span>
+        </div>
+      )}
+
+      {!isClosed && isExpired && (
+        <div className="poll-notice-banner banner-expired">
+          <span className="notice-badge">POLL ENDED</span>
+          <span className="notice-text">Voting ended because the poll reached its scheduled deadline.</span>
+        </div>
+      )}
+
       {/* Main Grid: Voting Card + Results Card */}
       <div className="poll-layout-grid">
         {/* Voting Panel */}
         <div className="poll-voting-card">
           <div className="card-header">
             <h2 className="card-heading">
-              {hasVoted ? 'Your Vote' : isClosed ? 'Voting Closed' : isExpired ? 'Poll Expired' : 'Cast Your Vote'}
+              {hasVoted ? 'Your Selection' : isClosed ? 'Voting Closed' : isExpired ? 'Poll Expired' : 'Cast Your Vote'}
             </h2>
             <p className="card-subtext">
               {hasVoted
-                ? 'Thank you for participating! Results below update automatically.'
+                ? 'Your response is logged. Watch the live distribution update in real time.'
                 : isClosed
                 ? 'This poll is no longer accepting new responses.'
                 : isExpired
                 ? 'The deadline for this poll has passed.'
-                : 'Select one choice and click submit to vote.'}
+                : 'Select one option below and submit to record your anonymous vote.'}
             </p>
           </div>
 
@@ -339,11 +380,13 @@ export function PublicPollPage() {
                 return (
                   <label
                     key={optId}
+                    htmlFor={`poll-opt-${optId}`}
                     className={`option-choice-label ${isSelected ? 'selected' : ''} ${
                       isUserChoice ? 'voted-choice' : ''
                     } ${votingDisabled ? 'disabled' : ''}`}
                   >
                     <input
+                      id={`poll-opt-${optId}`}
                       type="radio"
                       name="poll-choice"
                       value={optId}
@@ -380,9 +423,9 @@ export function PublicPollPage() {
 
             {hasVoted && (
               <div className="voted-confirmation-box">
-                <span className="voted-icon">✓</span>
+                <IconCheckCircle size={18} className="text-emerald" />
                 <span className="voted-message">
-                  Your vote is recorded in MongoDB and reflected in the live Redis counters.
+                  Your vote has been counted and broadcast live to all active viewers.
                 </span>
               </div>
             )}

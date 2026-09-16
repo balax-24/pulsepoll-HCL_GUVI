@@ -6,6 +6,17 @@ import { usePollWebSocket } from '../hooks/usePollWebSocket.js'
 import { PollResults } from '../components/PollResults.jsx'
 import { LiveBadge } from '../components/LiveBadge.jsx'
 import { Alert } from '../components/Alert.jsx'
+import {
+  IconCopy,
+  IconCheck,
+  IconEdit,
+  IconTrash,
+  IconExternalLink,
+  IconLock,
+  IconAlertTriangle,
+  IconSliders,
+  IconClock,
+} from '../components/Icons.jsx'
 
 export function ManagePollPage() {
   const { id: pollId } = useParams()
@@ -206,7 +217,9 @@ export function ManagePollPage() {
   if (error && !poll) {
     return (
       <div className="poll-error-card">
-        <div className="error-icon">🔒</div>
+        <div className="error-icon-wrapper">
+          <IconLock size={32} className="text-amber" />
+        </div>
         <h2 className="error-title">Access Restricted</h2>
         <p className="error-desc">{error}</p>
         <Link to="/dashboard" className="btn btn-primary mt-4">
@@ -220,19 +233,21 @@ export function ManagePollPage() {
 
   return (
     <div className="manage-poll-container">
-      {/* Header */}
+      {/* Header / Console Top Bar */}
       <div className="manage-header-card">
         <div className="manage-top-row">
           <div className="manage-status-group">
             <LiveBadge status={wsStatus} />
             <span className={`badge ${isClosed ? 'badge-closed' : 'badge-active'}`}>
-              {isClosed ? 'Closed' : 'Active'}
+              <span className={`badge-dot ${isClosed ? 'dot-gray' : 'dot-emerald'}`} />
+              <span>{isClosed ? 'Closed' : 'Active'}</span>
             </span>
           </div>
 
           <div className="manage-nav-actions">
             <Link to={`/polls/${pollId}`} className="btn btn-sm btn-outline">
-              Open Public View ↗
+              <IconExternalLink size={14} />
+              <span>Open Public View</span>
             </Link>
             <Link to="/dashboard" className="btn btn-sm btn-ghost">
               Back to Dashboard
@@ -240,14 +255,14 @@ export function ManagePollPage() {
           </div>
         </div>
 
-        {/* Question Title & Edit Form */}
+        {/* Question Title & Inline Edit Form */}
         {isEditingQuestion ? (
           <form onSubmit={handleSaveQuestion} className="edit-question-form">
             <input
               type="text"
               value={editedQuestion}
               onChange={(e) => setEditedQuestion(e.target.value)}
-              className="form-input mb-2"
+              className="form-input mb-2 form-input-lg"
               disabled={isProcessing}
               required
             />
@@ -281,16 +296,28 @@ export function ManagePollPage() {
                 onClick={() => setIsEditingQuestion(true)}
                 className="btn btn-sm btn-ghost edit-btn"
                 title="Edit poll question"
+                aria-label="Edit question"
               >
-                ✏️ Edit
+                <IconEdit size={14} />
+                <span>Edit</span>
               </button>
             )}
           </div>
         )}
 
         <div className="manage-meta-row">
-          <span>Poll ID: <code>{pollId}</code></span>
-          <span>• Created: {poll?.created_at ? new Date(poll.created_at).toLocaleString() : 'Recently'}</span>
+          <span className="meta-item">
+            Poll ID: <code className="meta-code">{pollId}</code>
+          </span>
+          <span className="meta-item">
+            Created: {poll?.created_at ? new Date(poll.created_at).toLocaleString() : 'Recently'}
+          </span>
+          {poll?.expires_at && (
+            <span className="meta-item meta-deadline">
+              <IconClock size={12} className="meta-inline-icon" />
+              Deadline: {new Date(poll.expires_at).toLocaleString()}
+            </span>
+          )}
         </div>
       </div>
 
@@ -322,13 +349,25 @@ export function ManagePollPage() {
             readOnly
             value={publicUrl}
             className="form-input share-url-input"
+            aria-label="Public Poll URL"
           />
           <button
             type="button"
             onClick={handleCopyLink}
             className="btn btn-secondary copy-action-btn"
+            aria-label="Copy Link"
           >
-            {copied ? '✓ Copied!' : '📋 Copy Link'}
+            {copied ? (
+              <>
+                <IconCheck size={14} className="text-emerald" />
+                <span>✓ Link Copied!</span>
+              </>
+            ) : (
+              <>
+                <IconCopy size={14} />
+                <span>Copy Link</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -370,23 +409,26 @@ export function ManagePollPage() {
                 </div>
               ) : (
                 <div className="control-item closed-state-info">
-                  <span className="badge badge-closed">Poll is Closed</span>
-                  <p>This poll is archived and no longer accepting votes.</p>
+                  <div className="closed-state-header">
+                    <span className="badge badge-closed">Poll is Closed</span>
+                  </div>
+                  <p className="closed-state-desc">This poll is archived and no longer accepting votes.</p>
                 </div>
               )}
 
               <div className="control-item control-item-danger">
                 <div className="control-item-info">
                   <strong>Delete Poll</strong>
-                  <p>Permanently disables this poll. Public viewers will receive a 404.</p>
+                  <p>Permanently removes this poll. Public viewers will receive a 404.</p>
                 </div>
                 <button
                   type="button"
                   onClick={handleDeletePoll}
-                  className="btn btn-danger"
+                  className="btn btn-danger delete-btn"
                   disabled={isProcessing}
                 >
-                  {isProcessing ? 'Deleting...' : 'Delete Poll'}
+                  <IconTrash size={14} />
+                  <span>{isProcessing ? 'Deleting...' : 'Delete Poll'}</span>
                 </button>
               </div>
             </div>

@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Alert } from '../components/Alert.jsx'
+import { IconActivity, IconEye, IconEyeOff } from '../components/Icons.jsx'
 
 export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -49,21 +51,10 @@ export function LoginPage() {
   return (
     <div className="auth-page-container">
       <div className="auth-card">
+        {/* Top Branding & Header */}
         <div className="auth-header">
-          <div className="auth-icon-badge">
-            <svg
-              className="auth-header-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-              <polyline points="10 17 15 12 10 7" />
-              <line x1="15" y1="12" x2="3" y2="12" />
-            </svg>
+          <div className="auth-brand-badge">
+            <IconActivity size={20} className="auth-pulse-icon" />
           </div>
           <h1 className="auth-title">Welcome Back</h1>
           <p className="auth-subtitle">Sign in to manage and view your real-time polls</p>
@@ -89,7 +80,7 @@ export function LoginPage() {
               className="form-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder="you@company.com"
               required
               autoComplete="email"
               disabled={isSubmitting}
@@ -102,22 +93,34 @@ export function LoginPage() {
                 Password
               </label>
             </div>
-            <input
-              id="login-password"
-              type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              autoComplete="current-password"
-              disabled={isSubmitting}
-            />
+            <div className="password-input-wrapper">
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                className="form-input password-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                autoComplete="current-password"
+                disabled={isSubmitting}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide visibility' : 'Show visibility'}
+                title={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+              </button>
+            </div>
           </div>
 
           <button
             type="submit"
-            className="btn btn-primary btn-block"
+            className="btn btn-primary btn-block btn-auth-submit"
             disabled={isSubmitting}
           >
             {isSubmitting ? (
