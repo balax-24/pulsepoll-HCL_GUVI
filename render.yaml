@@ -18,7 +18,7 @@ services:
         value: pulsepoll
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: pulsepoll-redis
           property: connectionString
       - key: JWT_SECRET
@@ -34,7 +34,6 @@ services:
     runtime: static
     buildCommand: cd frontend && npm ci && npm run build
     staticPublishPath: frontend/dist
-    plan: free
     routes:
       # SPA rewrite rule: direct navigation to /polls/:id or /dashboard serves index.html
       - type: rewrite
@@ -45,7 +44,7 @@ services:
         sync: false
 
   # 3. PulsePoll Managed Redis (Counters & Pub/Sub)
-  - type: redis
+  - type: keyvalue
     name: pulsepoll-redis
     plan: free
     ipAllowList: []
