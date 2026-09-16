@@ -60,7 +60,7 @@ It enables creators to build interactive polls, share public links with audience
 │   │   ├── auth/             # (Phase 4)
 │   │   ├── polls/            # (Phase 5)
 │   │   ├── votes/            # (Phase 6)
-│   │   └── websocket/        # (Phase 8)
+│   │   └── websocket/        # (Phase 7)
 │   ├── .env.example          # Backend configuration reference
 │   ├── go.mod                # Go module specification
 │   └── go.sum                # Cryptographic checksums for dependencies
@@ -281,3 +281,125 @@ redis-cli HGETALL poll:6aa9ed250cf658f70a932a87:votes
   ]
 }
 ```
+
+---
+
+## 7. Realtime Broadcasting Architecture (Phase 7)
+
+### Component Responsibilities
+
+| Component | Responsibility |
+| :--- | :--- |
+| **MongoDB** | Durable source of truth for users, polls, options, and immutable vote audit logs. Poll documents store **zero** mutable vote counter fields. |
+| **Redis Hash (`poll:{id}:votes`)** | Authoritative live counter aggregation. Modified strictly via atomic `HINCRBY`. Read by results queries and snapshot generators. |
+| **Redis Pub/Sub (`poll:{id}:updates`)** | Realtime event transport. Distributes lightweight JSON events across Go server instances. Transient, memory-efficient broadcast channel. |
+| **Go WebSocket Gateway (`PollHub`)** | Concurrency-safe client registry. Pre-validates polls before upgrade. Dynamically provisions Redis subscriptions on first client join; cancels them on last client exit. Dispatches ping/pong keepalives and isolates slow clients via buffered channels. |
+| **React Frontend (Phase 8)** | Consumer of WebSocket streams. Merges initial snapshot and incremental live vote updates into UI state without page reload. |
+
+### End-to-End Realtime Flow
+
+```
+Audience Member Votes (POST /api/polls/:id/vote)
+  │
+  ├── 1. Validate poll (active, not expired, valid option)
+  ├── 2. Persistent audit write to MongoDB (unique compound index prevents duplicates)
+  ├── 3. Atomic counter increment in Redis (HINCRBY poll:{id}:votes {opt} 1)
+  └── 4. Publish JSON event to Redis Pub/Sub (PUBLISH poll:{id}:updates)
+             │
+             ▼
+     Redis Pub/Sub Subscriber (Go backend)
+             │
+             ▼
+     Go PollHub (poll-scoped broadcast channel)
+             │
+             ▼
+     All Connected WebSockets (GET /api/polls/:id/ws)
+             │
+             ▼
+     Browser / React Client updates live bars & counts instantaneously
+```
+
+### WebSocket Endpoint: `GET /api/polls/:id/ws`
+
+* **Access**: Public audience endpoint (no creator auth required).
+* **Pre-Validation**: Checks hex ObjectID format, queries MongoDB for poll presence, and rejects soft-deleted polls with HTTP 404 before upgrading the HTTP connection.
+* **Closed Polls**: Audience members can connect to closed polls to view final results. When an active poll is closed by its creator, a terminal `poll_closed` event is broadcast to all connected viewers while preserving the connection.
+
+### WebSocket Protocol Message Contracts
+
+#### 1. Initial State: `results_snapshot`
+
+Sent immediately upon WebSocket connection to eliminate race conditions between connection establishment and in-flight votes:
+
+```json
+{
+  "type": "results_snapshot",
+  "poll_id": "6aa9ed250cf658f70a932a87",
+  "options": [
+    {
+      "option_id": "6aa9ed250cf658f70a932a84",
+      "text": "Redis",
+      "count": 12,
+      "votes": 12,
+      "percentage": 60.0
+    },
+    {
+      "option_id": "6aa9ed250cf658f70a932a85",
+      "text": "Memcached",
+      "count": 8,
+      "votes": 8,
+      "percentage": 40.0
+    }
+  ],
+  "total_votes": 20
+}
+```
+
+#### 2. Live Vote Update: `vote_update`
+
+Broadcast whenever an audience member casts a valid vote:
+
+```json
+{
+  "type": "vote_update",
+  "poll_id": "6aa9ed250cf658f70a932a87",
+  "option_id": "6aa9ed250cf658f70a932a84",
+  "count": 13,
+  "total_votes": 21,
+  "timestamp": "2026-09-16T01:38:25.619Z"
+}
+```
+
+*Strict Privacy Enforcement*: Realtime update events never include voter identifiers, session cookies, JWTs, or creator credentials.
+
+#### 3. Poll Lifecycle: `poll_closed`
+
+Broadcast when the creator closes the poll:
+
+```json
+{
+  "type": "poll_closed",
+  "poll_id": "6aa9ed250cf658f70a932a87",
+  "timestamp": "2026-09-16T01:38:38.572Z"
+}
+```
+
+### Initial State & Race Elimination Strategy
+
+To prevent the classic race condition where an audience member connects and misses in-flight votes that occurred before subscription:
+1. When a client connects, the Go backend registers the client with the `PollHub` and **ensures the Redis Pub/Sub subscription is active first** (awaiting subscription acknowledgement from Redis).
+2. The server queries the Redis live counter hash for the current tallies (`voteService.GetResults`).
+3. The server immediately enqueues the `results_snapshot` into the client's outbound buffer.
+4. Any vote in flight during connection either reflects in the snapshot read or arrives immediately as a subsequent `vote_update` event in the client's FIFO channel.
+
+### Dynamic Subscription Lifecycle
+
+To prevent unbounded resource consumption from thousands of idle polls:
+* **First Client Connects**: The `HubManager` dynamically allocates a `PollHub` and initiates the Redis Pub/Sub subscription for `poll:{pollID}:updates`.
+* **Last Client Disconnects**: The `PollHub` terminates its event loop, closes its Redis Pub/Sub subscription cleanly, and unregisters itself from `HubManager`.
+
+### Failure Semantics & Resilience
+
+* **Execution Order**: MongoDB persistence **always** precedes Redis mutation, which **always** precedes Redis Pub/Sub publishing.
+* **Failed Votes Never Broadcast**: If a vote is rejected (e.g. duplicate voter session, closed poll, database error), Redis `HINCRBY` and Pub/Sub are never invoked.
+* **Best-Effort Delivery**: If Redis Pub/Sub publishing encounters a network glitch after `HINCRBY` succeeds, the vote is **not** rolled back. The MongoDB vote record and Redis count remain durable and authoritative. The error is logged, and clients reconcile upon reconnection or results refresh.

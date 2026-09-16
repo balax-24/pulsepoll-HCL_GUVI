@@ -2,22 +2,26 @@ package votes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
 	"github.com/redis/go-redis/v9"
 )
 
-// VoteCounterStore specifies operations for managing live atomic vote counts in Redis.
+// VoteCounterStore specifies operations for managing live atomic vote counts in Redis
+// and publishing realtime broadcast events via Redis Pub/Sub.
 type VoteCounterStore interface {
 	IncrementVote(ctx context.Context, pollID, optionID string) (int64, error)
 	GetOptionCounts(ctx context.Context, pollID string, optionIDs []string) (map[string]int64, int64, error)
 	InitializeCounters(ctx context.Context, pollID string, optionIDs []string, initialCounts map[string]int64) error
 	HasCounters(ctx context.Context, pollID string) (bool, error)
 	ResetCounters(ctx context.Context, pollID string) error
+	PublishVoteUpdate(ctx context.Context, pollID string, event *VoteUpdateEvent) error
+	PublishPollClosed(ctx context.Context, pollID string, event *PollClosedEvent) error
 }
 
-// RedisVoteRepository implements VoteCounterStore backed by Redis Hash structures.
+// RedisVoteRepository implements VoteCounterStore backed by Redis Hash structures and Pub/Sub channels.
 type RedisVoteRepository struct {
 	client *redis.Client
 }
@@ -112,4 +116,36 @@ func (r *RedisVoteRepository) HasCounters(ctx context.Context, pollID string) (b
 func (r *RedisVoteRepository) ResetCounters(ctx context.Context, pollID string) error {
 	key := pollVotesKey(pollID)
 	return r.client.Del(ctx, key).Err()
+}
+
+// pollUpdatesChannel constructs the Redis Pub/Sub channel for a specific poll.
+// Format: poll:{pollID}:updates
+func pollUpdatesChannel(pollID string) string {
+	return fmt.Sprintf("poll:%s:updates", pollID)
+}
+
+// PublishVoteUpdate marshals and publishes a VoteUpdateEvent to Redis channel poll:{pollID}:updates.
+func (r *RedisVoteRepository) PublishVoteUpdate(ctx context.Context, pollID string, event *VoteUpdateEvent) error {
+	channel := pollUpdatesChannel(pollID)
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal vote update event for poll %s: %w", pollID, err)
+	}
+	if err := r.client.Publish(ctx, channel, payload).Err(); err != nil {
+		return fmt.Errorf("failed to publish vote update to channel %s: %w", channel, err)
+	}
+	return nil
+}
+
+// PublishPollClosed marshals and publishes a PollClosedEvent to Redis channel poll:{pollID}:updates.
+func (r *RedisVoteRepository) PublishPollClosed(ctx context.Context, pollID string, event *PollClosedEvent) error {
+	channel := pollUpdatesChannel(pollID)
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal poll closed event for poll %s: %w", pollID, err)
+	}
+	if err := r.client.Publish(ctx, channel, payload).Err(); err != nil {
+		return fmt.Errorf("failed to publish poll closed event to channel %s: %w", channel, err)
+	}
+	return nil
 }

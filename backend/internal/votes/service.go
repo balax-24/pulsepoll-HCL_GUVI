@@ -131,12 +131,51 @@ func (s *Service) CastVote(ctx context.Context, pollID, optionID, voterID string
 
 	// 8. Atomically increment Redis live counter (HINCRBY)
 	// Guaranteed execution only after successful MongoDB persistence
-	if err := s.incrementRedisWithRetry(ctx, pollID, optionID, 3); err != nil {
+	newCount, err := s.incrementRedisWithRetry(ctx, pollID, optionID, 3)
+	if err != nil {
 		slog.Error("Failed to increment Redis live counter after vote persistence",
 			slog.String("poll_id", pollID),
 			slog.String("option_id", optionID),
 			slog.String("error", err.Error()),
 		)
+	} else {
+		// 9. Redis HINCRBY succeeded -> Publish realtime event to Redis Pub/Sub channel poll:{pollID}:updates
+		optionIDs := make([]string, len(poll.Options))
+		for i, opt := range poll.Options {
+			optionIDs[i] = opt.ID
+		}
+		_, totalVotes, countErr := s.redisRepo.GetOptionCounts(ctx, pollID, optionIDs)
+		if countErr != nil {
+			totalVotes = newCount
+		}
+
+		event := &VoteUpdateEvent{
+			Type:       EventTypeVoteUpdate,
+			PollID:     pollID,
+			OptionID:   optionID,
+			Count:      newCount,
+			TotalVotes: totalVotes,
+			Timestamp:  time.Now().UTC(),
+		}
+
+		pubCtx, pubCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		if pubErr := s.redisRepo.PublishVoteUpdate(pubCtx, pollID, event); pubErr != nil {
+			// Best-effort Pub/Sub delivery: Do NOT undo persisted vote.
+			// The Redis counter and MongoDB vote remain durable and authoritative.
+			slog.Error("Failed to publish vote update to Redis Pub/Sub after HINCRBY",
+				slog.String("poll_id", pollID),
+				slog.String("option_id", optionID),
+				slog.String("error", pubErr.Error()),
+			)
+		} else {
+			slog.Info("Vote update published to Redis Pub/Sub",
+				slog.String("poll_id", pollID),
+				slog.String("option_id", optionID),
+				slog.Int64("count", newCount),
+				slog.Int64("total_votes", totalVotes),
+			)
+		}
+		pubCancel()
 	}
 
 	return &CastVoteResponse{
@@ -236,23 +275,37 @@ func (s *Service) ensureRedisInitialized(ctx context.Context, poll *polls.Poll) 
 }
 
 // incrementRedisWithRetry attempts atomic HINCRBY with exponential backoff retries.
-func (s *Service) incrementRedisWithRetry(ctx context.Context, pollID, optionID string, maxRetries int) error {
+// Returns the resulting counter value directly from Redis.
+func (s *Service) incrementRedisWithRetry(ctx context.Context, pollID, optionID string, maxRetries int) (int64, error) {
 	var err error
+	var newVal int64
 	backoff := 10 * time.Millisecond
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		_, err = s.redisRepo.IncrementVote(ctx, pollID, optionID)
+		newVal, err = s.redisRepo.IncrementVote(ctx, pollID, optionID)
 		if err == nil {
-			return nil
+			return newVal, nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return 0, ctx.Err()
 		case <-time.After(backoff):
 			backoff *= 2
 		}
 	}
 
-	return err
+	return 0, err
+}
+
+// BroadcastPollClosed publishes a poll_closed event to the poll's updates channel in Redis Pub/Sub.
+func (s *Service) BroadcastPollClosed(ctx context.Context, pollID string) error {
+	event := &PollClosedEvent{
+		Type:      EventTypePollClosed,
+		PollID:    pollID,
+		Timestamp: time.Now().UTC(),
+	}
+	pubCtx, pubCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer pubCancel()
+	return s.redisRepo.PublishPollClosed(pubCtx, pollID, event)
 }

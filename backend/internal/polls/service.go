@@ -24,9 +24,15 @@ var (
 	ErrPollClosed = errors.New("poll is closed")
 )
 
+// PollEventBroadcaster allows broadcasting poll lifecycle events (e.g. poll closed).
+type PollEventBroadcaster interface {
+	BroadcastPollClosed(ctx context.Context, pollID string) error
+}
+
 // Service encapsulates core business and authorization logic for polls.
 type Service struct {
-	repo PollRepository
+	repo        PollRepository
+	broadcaster PollEventBroadcaster
 }
 
 // NewService creates a new Service backed by a PollRepository.
@@ -34,6 +40,11 @@ func NewService(repo PollRepository) *Service {
 	return &Service{
 		repo: repo,
 	}
+}
+
+// SetBroadcaster registers an optional realtime event broadcaster.
+func (s *Service) SetBroadcaster(b PollEventBroadcaster) {
+	s.broadcaster = b
 }
 
 // CreatePoll validates inputs, assigns stable IDs to options, and creates an active poll document.
@@ -196,6 +207,10 @@ func (s *Service) UpdateStatus(ctx context.Context, creatorID, pollID string, re
 	updated, err := s.repo.UpdateStatus(ctx, pollID, req.Status)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update poll status: %w", err)
+	}
+
+	if req.Status == PollStatusClosed && s.broadcaster != nil {
+		_ = s.broadcaster.BroadcastPollClosed(ctx, pollID)
 	}
 
 	return updated.ToResponse(), nil

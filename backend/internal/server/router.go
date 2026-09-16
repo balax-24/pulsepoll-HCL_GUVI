@@ -12,6 +12,7 @@ import (
 	"pulsepoll/backend/internal/polls"
 	"pulsepoll/backend/internal/response"
 	"pulsepoll/backend/internal/votes"
+	"pulsepoll/backend/internal/websocket"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,6 +25,7 @@ func SetupRouter(
 	authHandler *auth.Handler,
 	pollHandler *polls.Handler,
 	voteHandler *votes.Handler,
+	wsHandler *websocket.Handler,
 	jwtMgr *auth.JWTManager,
 ) *gin.Engine {
 	if cfg.IsProduction() {
@@ -70,10 +72,11 @@ func SetupRouter(
 		// Polls group
 		pollsGroup := api.Group("/polls")
 		{
-			// Public audience endpoints: GET poll, GET results, POST vote
+			// Public audience endpoints: GET poll, GET results, POST vote, GET ws
 			pollsGroup.GET("/:id", pollHandler.GetPublic)
 			pollsGroup.GET("/:id/results", voteHandler.GetResults)
 			pollsGroup.POST("/:id/vote", voteHandler.CastVote)
+			pollsGroup.GET("/:id/ws", wsHandler.ServeWS)
 
 			// Protected creator management endpoints
 			protected := pollsGroup.Group("")

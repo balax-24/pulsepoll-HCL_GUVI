@@ -18,6 +18,7 @@ import (
 	"pulsepoll/backend/internal/polls"
 	"pulsepoll/backend/internal/server"
 	"pulsepoll/backend/internal/votes"
+	"pulsepoll/backend/internal/websocket"
 )
 
 func main() {
@@ -109,8 +110,15 @@ func main() {
 	voteService := votes.NewService(pollRepo, voteRepo, redisVoteRepo)
 	voteHandler := votes.NewHandler(voteService)
 
+	// Connect poll event broadcaster to vote service for realtime poll lifecycle events
+	pollService.SetBroadcaster(voteService)
+
+	// Initialize WebSocket hub manager and HTTP handler
+	hubManager := websocket.NewHubManager(redisClient.Raw())
+	wsHandler := websocket.NewHandler(hubManager, pollRepo, voteService, cfg.AllowedOrigins)
+
 	// Set up router and HTTP server
-	router := server.SetupRouter(cfg, mongoClient, redisClient, authHandler, pollHandler, voteHandler, jwtMgr)
+	router := server.SetupRouter(cfg, mongoClient, redisClient, authHandler, pollHandler, voteHandler, wsHandler, jwtMgr)
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),
 		Handler:      router,
@@ -145,14 +153,17 @@ func main() {
 		slog.Info("HTTP server stopped gracefully")
 	}
 
-	// 2. Disconnect MongoDB
+	// 2. Terminate active WebSocket hubs and Pub/Sub subscriptions
+	hubManager.Shutdown()
+
+	// 3. Disconnect MongoDB
 	if err := mongoClient.Close(shutdownCtx); err != nil {
 		slog.Error("Error disconnecting MongoDB", slog.String("error", err.Error()))
 	} else {
 		slog.Info("MongoDB connection closed cleanly")
 	}
 
-	// 3. Disconnect Redis
+	// 4. Disconnect Redis
 	if err := redisClient.Close(); err != nil {
 		slog.Error("Error closing Redis connection", slog.String("error", err.Error()))
 	} else {

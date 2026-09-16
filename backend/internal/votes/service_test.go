@@ -96,9 +96,12 @@ func (m *mockVoteRepository) EnsureIndexes(ctx context.Context) error {
 
 // mockVoteCounterStore implements VoteCounterStore in-memory.
 type mockVoteCounterStore struct {
-	mu          sync.Mutex
-	counts      map[string]map[string]int64 // pollID -> (optionID -> count)
-	simulateErr bool
+	mu               sync.Mutex
+	counts           map[string]map[string]int64 // pollID -> (optionID -> count)
+	publishedUpdates []*VoteUpdateEvent
+	publishedClosed  []*PollClosedEvent
+	simulateErr      bool
+	simulatePubErr   bool
 }
 
 func newMockVoteCounterStore() *mockVoteCounterStore {
@@ -171,6 +174,28 @@ func (m *mockVoteCounterStore) ResetCounters(ctx context.Context, pollID string)
 	defer m.mu.Unlock()
 
 	delete(m.counts, pollID)
+	return nil
+}
+
+func (m *mockVoteCounterStore) PublishVoteUpdate(ctx context.Context, pollID string, event *VoteUpdateEvent) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.simulateErr || m.simulatePubErr {
+		return errors.New("redis publish failure")
+	}
+	m.publishedUpdates = append(m.publishedUpdates, event)
+	return nil
+}
+
+func (m *mockVoteCounterStore) PublishPollClosed(ctx context.Context, pollID string, event *PollClosedEvent) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.simulateErr || m.simulatePubErr {
+		return errors.New("redis publish failure")
+	}
+	m.publishedClosed = append(m.publishedClosed, event)
 	return nil
 }
 
@@ -384,5 +409,96 @@ func TestService_GetResults(t *testing.T) {
 			t.Errorf("expected 3 total votes on fallback, got %d", res.TotalVotes)
 		}
 		redisRepo.simulateErr = false
+	})
+
+	t.Run("vote publication triggers VoteUpdateEvent with correct counters", func(t *testing.T) {
+		svcNew, _, _, redisNew, testPollNew := setupServiceTestFixture()
+		pollIDNew := testPollNew.ID.Hex()
+
+		resp, err := svcNew.CastVote(ctx, pollIDNew, "opt_go", "voter_live_1")
+		if err != nil {
+			t.Fatalf("expected vote success, got %v", err)
+		}
+		if resp == nil {
+			t.Fatal("expected non-nil response")
+		}
+
+		redisNew.mu.Lock()
+		defer redisNew.mu.Unlock()
+
+		if len(redisNew.publishedUpdates) != 1 {
+			t.Fatalf("expected 1 published event, got %d", len(redisNew.publishedUpdates))
+		}
+		event := redisNew.publishedUpdates[0]
+		if event.Type != EventTypeVoteUpdate {
+			t.Errorf("expected event type %s, got %s", EventTypeVoteUpdate, event.Type)
+		}
+		if event.PollID != pollIDNew {
+			t.Errorf("expected pollID %s, got %s", pollIDNew, event.PollID)
+		}
+		if event.OptionID != "opt_go" {
+			t.Errorf("expected optionID opt_go, got %s", event.OptionID)
+		}
+		if event.Count != 1 {
+			t.Errorf("expected count 1, got %d", event.Count)
+		}
+		if event.TotalVotes != 1 {
+			t.Errorf("expected total votes 1, got %d", event.TotalVotes)
+		}
+		if event.Timestamp.IsZero() {
+			t.Error("expected non-zero event timestamp")
+		}
+	})
+
+	t.Run("failed PubSub does not fail the vote (best-effort delivery)", func(t *testing.T) {
+		svcNew, _, _, redisNew, testPollNew := setupServiceTestFixture()
+		pollIDNew := testPollNew.ID.Hex()
+
+		// Simulate Redis Publish failure specifically
+		redisNew.simulatePubErr = true
+
+		resp, err := svcNew.CastVote(ctx, pollIDNew, "opt_go", "voter_resilient")
+		if err != nil {
+			t.Fatalf("expected vote to succeed even if PubSub delivery fails, got error: %v", err)
+		}
+		if resp == nil {
+			t.Fatal("expected non-nil response")
+		}
+
+		// Result should still be stored in Redis and MongoDB
+		results, err := svcNew.GetResults(ctx, pollIDNew)
+		if err != nil {
+			t.Fatalf("expected results to be retrievable, got %v", err)
+		}
+		if results.TotalVotes != 1 {
+			t.Errorf("expected 1 total vote, got %d", results.TotalVotes)
+		}
+	})
+
+	t.Run("duplicate vote is rejected and never publishes to PubSub", func(t *testing.T) {
+		svcNew, _, _, redisNew, testPollNew := setupServiceTestFixture()
+		pollIDNew := testPollNew.ID.Hex()
+
+		// First vote succeeds
+		_, err := svcNew.CastVote(ctx, pollIDNew, "opt_go", "voter_dup_test")
+		if err != nil {
+			t.Fatalf("first vote failed: %v", err)
+		}
+
+		redisNew.mu.Lock()
+		initialPubCount := len(redisNew.publishedUpdates)
+		redisNew.mu.Unlock()
+
+		// Duplicate vote attempt
+		_, err = svcNew.CastVote(ctx, pollIDNew, "opt_go", "voter_dup_test")
+		if !errors.Is(err, ErrDuplicateVote) {
+			t.Fatalf("expected ErrDuplicateVote, got %v", err)
+		}
+
+		redisNew.mu.Lock()
+		defer redisNew.mu.Unlock()
+		if len(redisNew.publishedUpdates) != initialPubCount {
+			t.Errorf("duplicate vote published an event! expected count %d, got %d", initialPubCount, len(redisNew.publishedUpdates))
+		}
 	})
 }

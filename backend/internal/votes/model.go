@@ -43,3 +43,48 @@ type PollResultsResponse struct {
 	TotalVotes int64          `json:"total_votes"`
 	Results    []OptionResult `json:"results"`
 }
+
+// Realtime event types for WebSocket and Redis Pub/Sub broadcasting.
+const (
+	EventTypeResultsSnapshot = "results_snapshot"
+	EventTypeVoteUpdate      = "vote_update"
+	EventTypePollClosed      = "poll_closed"
+)
+
+// VoteUpdateEvent represents the live event published to Redis Pub/Sub
+// and forwarded over WebSockets when a vote is recorded.
+// Strict privacy: Never contains voter IDs, creator info, or JWTs.
+type VoteUpdateEvent struct {
+	Type       string    `json:"type"`
+	PollID     string    `json:"poll_id"`
+	OptionID   string    `json:"option_id"`
+	Count      int64     `json:"count"`
+	TotalVotes int64     `json:"total_votes"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+// SnapshotOption represents an option within a results snapshot payload.
+// Exposes both 'count' and 'votes' for complete client compatibility.
+type SnapshotOption struct {
+	OptionID   string  `json:"option_id"`
+	Text       string  `json:"text"`
+	Count      int64   `json:"count"`
+	Votes      int64   `json:"votes"`
+	Percentage float64 `json:"percentage"`
+}
+
+// ResultsSnapshotEvent represents the full results payload sent immediately
+// upon WebSocket connection to prevent missed-update races.
+type ResultsSnapshotEvent struct {
+	Type       string           `json:"type"`
+	PollID     string           `json:"poll_id"`
+	Options    []SnapshotOption `json:"options"`
+	TotalVotes int64            `json:"total_votes"`
+}
+
+// PollClosedEvent represents a notification that the poll has been closed.
+type PollClosedEvent struct {
+	Type      string    `json:"type"`
+	PollID    string    `json:"poll_id"`
+	Timestamp time.Time `json:"timestamp"`
+}
