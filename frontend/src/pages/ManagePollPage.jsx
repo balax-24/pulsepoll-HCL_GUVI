@@ -13,8 +13,6 @@ import {
   IconTrash,
   IconExternalLink,
   IconLock,
-  IconAlertTriangle,
-  IconSliders,
   IconClock,
 } from '../components/Icons.jsx'
 

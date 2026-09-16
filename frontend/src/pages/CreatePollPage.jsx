@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createPoll } from '../api/polls.js'
 import { Alert } from '../components/Alert.jsx'
-import { IconCheckCircle, IconCopy, IconCheck, IconPlus, IconX, IconArrowRight, IconExternalLink } from '../components/Icons.jsx'
+import { IconCheckCircle, IconCopy, IconCheck, IconPlus, IconX, IconArrowRight } from '../components/Icons.jsx'
 
 export function CreatePollPage() {
   const [question, setQuestion] = useState('')

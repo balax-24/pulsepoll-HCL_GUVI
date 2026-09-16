@@ -3,16 +3,13 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   IconRadio,
-  IconShare2,
   IconUsers,
   IconShield,
-  IconSliders,
   IconDatabase,
   IconCpu,
   IconServer,
   IconActivity,
   IconArrowRight,
-  IconCheck,
 } from '../components/Icons.jsx'
 
 export function HomePage() {
