@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { LogoMark } from '../components/LogoMark.jsx'
 import {
+  IconArrowRight,
+  IconCheck,
   IconRadio,
   IconUsers,
   IconShield,
-  IconDatabase,
-  IconCpu,
-  IconServer,
-  IconActivity,
-  IconArrowRight,
+  IconSparkles,
 } from '../components/Icons.jsx'
 
 export function HomePage() {
@@ -18,21 +17,20 @@ export function HomePage() {
   // Interactive Live Demo Simulation State
   const [demoSelected, setDemoSelected] = useState(null)
   const [demoVotes, setDemoVotes] = useState({
-    go: 60,
-    rust: 40,
-    python: 28,
+    hybrid: 52,
+    remote: 38,
+    office: 16,
   })
   const [demoLastVoted, setDemoLastVoted] = useState(null)
 
   // Calculate live demo totals & percentages
-  const demoTotal = demoVotes.go + demoVotes.rust + demoVotes.python
+  const demoTotal = demoVotes.hybrid + demoVotes.remote + demoVotes.office
   const getPercent = (count) => (demoTotal > 0 ? Math.round((count / demoTotal) * 100) : 0)
 
   // Gentle subtle realtime tick effect to show live behavior
   useEffect(() => {
     const timer = setInterval(() => {
-      // Periodically add a simulated tick to one option
-      const choices = ['go', 'rust', 'python']
+      const choices = ['hybrid', 'remote', 'office']
       const choice = choices[Math.floor(Math.random() * choices.length)]
       setDemoVotes((prev) => ({
         ...prev,
@@ -41,7 +39,7 @@ export function HomePage() {
       setDemoLastVoted(choice)
       const clearFlash = setTimeout(() => setDemoLastVoted(null), 1200)
       return () => clearTimeout(clearFlash)
-    }, 6000)
+    }, 6500)
 
     return () => clearInterval(timer)
   }, [])
@@ -58,332 +56,374 @@ export function HomePage() {
 
   return (
     <div className="home-page">
-      {/* Hero Section */}
+      {/* 1. Hero Section — Human, Welcoming, Editorial */}
       <section className="hero-section">
-        <div className="hero-pill-badge">
-          <span className="pulse-indicator-dot" />
-          <span className="hero-pill-text">Engineered for High-Concurrency Realtime Polling</span>
+        <div className="hero-container">
+          <div className="hero-text-column">
+            <div className="hero-kicker-badge">
+              <span className="kicker-pulse-dot" />
+              <span>Real-time audience polling</span>
+            </div>
+
+            <h1 className="hero-main-title">
+              Ask a question. <br />
+              <span className="title-highlight">Watch everyone answer.</span>
+            </h1>
+
+            <p className="hero-lead-text">
+              Turn any room, meeting, or online audience into an active conversation.
+              Create a poll in seconds, share one link, and watch responses stream in live.
+            </p>
+
+            <div className="hero-cta-row">
+              {isAuthenticated ? (
+                <Link to="/polls/create" className="btn btn-lg btn-primary hero-btn-coral">
+                  <span>Create a Poll</span>
+                  <IconArrowRight size={18} />
+                </Link>
+              ) : (
+                <Link to="/register" className="btn btn-lg btn-primary hero-btn-coral">
+                  <span>Create a Poll</span>
+                  <IconArrowRight size={18} />
+                </Link>
+              )}
+              <a href="#how-it-works" className="btn btn-lg btn-ghost hero-btn-ghost">
+                <span>See how it works</span>
+              </a>
+            </div>
+
+            {/* Quick Trust Highlights */}
+            <div className="hero-trust-row">
+              <div className="trust-item">
+                <IconCheck size={16} className="trust-icon" />
+                <span>No app downloads</span>
+              </div>
+              <div className="trust-item">
+                <IconCheck size={16} className="trust-icon" />
+                <span>No sign-up for voters</span>
+              </div>
+              <div className="trust-item">
+                <IconCheck size={16} className="trust-icon" />
+                <span>Instant live sync</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Hero Visual Column */}
+          <div className="hero-visual-column">
+            <div className="hero-visual-frame">
+              <img
+                src="/images/hero-visual.webp"
+                alt="Diverse people participating together in a live PulsePoll session"
+                className="hero-editorial-image"
+                width="640"
+                height="360"
+                loading="eager"
+              />
+              <div className="hero-visual-floating-card">
+                <div className="floating-card-icon">
+                  <LogoMark size={24} variant="coral" />
+                </div>
+                <div className="floating-card-text">
+                  <span className="floating-card-title">Live Participation</span>
+                  <span className="floating-card-desc">Responses update live without refresh</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. Visual Storytelling: 01 CREATE · 02 SHARE · 03 WATCH LIVE */}
+      <section id="how-it-works" className="storytelling-section">
+        <div className="section-intro">
+          <span className="section-eyebrow">How PulsePoll Works</span>
+          <h2 className="section-headline">Simple for you. Effortless for your audience.</h2>
+          <p className="section-subheadline">
+            Three natural steps from asking a question to seeing collective clarity.
+          </p>
         </div>
 
-        <h1 className="hero-headline">
-          Ask once. <br />
-          <span className="headline-gradient">Watch everyone answer. Live.</span>
-        </h1>
+        <div className="story-campaign-list">
+          {/* Step 01: CREATE */}
+          <div className="story-row story-row-normal">
+            <div className="story-image-wrap">
+              <img
+                src="/images/workflow-create.webp"
+                alt="Creator typing a question into PulsePoll interface"
+                className="story-image"
+                loading="lazy"
+                width="500"
+                height="375"
+              />
+            </div>
+            <div className="story-content-wrap">
+              <span className="story-step-index">01 &mdash; CREATE</span>
+              <h3 className="story-title">Turn a question into a poll.</h3>
+              <p className="story-description">
+                Type what you want to ask. Add 2 to 10 choices. Customize options or set an automatic closing deadline.
+                No complex forms, templates, or setup wizards.
+              </p>
+              <div className="story-feature-list">
+                <span className="story-pill">Clean option editor</span>
+                <span className="story-pill">Optional deadlines</span>
+                <span className="story-pill">Instant preview</span>
+              </div>
+            </div>
+          </div>
 
-        <p className="hero-subheadline">
-          Create instant interactive polls, distribute a single link to your audience,
-          and stream vote tallies live to every screen without refreshing.
-        </p>
+          {/* Step 02: SHARE */}
+          <div className="story-row story-row-reverse">
+            <div className="story-content-wrap">
+              <span className="story-step-index">02 &mdash; SHARE</span>
+              <h3 className="story-title">Send one link to everyone.</h3>
+              <p className="story-description">
+                Copy the share link or project it onto a presentation screen.
+                Audience members tap the link on their phones or laptops and vote immediately.
+                No account required, no passwords, zero barrier to participation.
+              </p>
+              <div className="story-feature-list">
+                <span className="story-pill">One-click copy</span>
+                <span className="story-pill">Zero login for voters</span>
+                <span className="story-pill">Any mobile browser</span>
+              </div>
+            </div>
+            <div className="story-image-wrap">
+              <img
+                src="/images/workflow-share.webp"
+                alt="Phone displaying shareable poll link connecting people"
+                className="story-image"
+                loading="lazy"
+                width="500"
+                height="375"
+              />
+            </div>
+          </div>
 
-        <div className="hero-cta-group">
-          {isAuthenticated ? (
-            <Link to="/polls/create" className="btn btn-lg btn-primary hero-primary-btn">
-              <span>Create a Poll</span>
-              <IconArrowRight size={18} />
-            </Link>
-          ) : (
-            <>
-              <Link to="/register" className="btn btn-lg btn-primary hero-primary-btn">
-                <span>Create a Poll</span>
+          {/* Step 03: WATCH LIVE */}
+          <div className="story-row story-row-normal">
+            <div className="story-image-wrap">
+              <img
+                src="/images/workflow-watch.webp"
+                alt="Screen with animated live voting bars and audience reacting"
+                className="story-image"
+                loading="lazy"
+                width="500"
+                height="375"
+              />
+            </div>
+            <div className="story-content-wrap">
+              <span className="story-step-index">03 &mdash; WATCH LIVE</span>
+              <h3 className="story-title">See responses appear as they happen.</h3>
+              <p className="story-description">
+                As votes roll in, the results bar smoothly animates across all connected screens at once.
+                Percentages, counts, and leading choices adjust in real time over persistent WebSockets.
+              </p>
+              <div className="story-feature-list">
+                <span className="story-pill">Smooth CSS transitions</span>
+                <span className="story-pill">Live vote counts</span>
+                <span className="story-pill">No manual refreshing</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Interactive Live Product Preview Card */}
+      <section className="demo-preview-section">
+        <div className="demo-container">
+          <div className="demo-preview-header">
+            <div className="demo-eyebrow-group">
+              <span className="demo-status-dot-mint" />
+              <span className="demo-preview-tag">Interactive Product Preview</span>
+            </div>
+            <h2 className="demo-headline">Experience the feel of a live poll right now</h2>
+            <p className="demo-subheadline">
+              Tap an option below to see how responses calculate and animate for audiences in real time.
+            </p>
+          </div>
+
+          <div className="demo-card-surface">
+            <div className="demo-card-top">
+              <div className="demo-card-meta">
+                <span className="demo-badge-live">● Live</span>
+                <span className="demo-badge-type">Team Decision Poll</span>
+              </div>
+              <span className="demo-action-hint">
+                {demoSelected ? '✓ Your sample vote was cast' : 'Select an option to test'}
+              </span>
+            </div>
+
+            <h3 className="demo-poll-question">
+              Which working model creates the best team energy for 2026?
+            </h3>
+
+            <div className="demo-options-list" role="radiogroup" aria-label="Interactive poll sample options">
+              {/* Option 1 */}
+              <button
+                type="button"
+                onClick={() => handleDemoVote('hybrid')}
+                disabled={Boolean(demoSelected)}
+                className={`demo-option-item ${demoSelected === 'hybrid' ? 'voted' : ''} ${
+                  demoLastVoted === 'hybrid' ? 'flash-tick' : ''
+                }`}
+              >
+                <div className="demo-option-row">
+                  <div className="demo-option-label">
+                    <span className="demo-option-number">01</span>
+                    <span className="demo-option-text">Hybrid (2–3 flexible days in office)</span>
+                    {demoSelected === 'hybrid' && <span className="demo-vote-pill">Your Vote</span>}
+                  </div>
+                  <div className="demo-option-stats">
+                    <span className="demo-count-val">{demoVotes.hybrid} votes</span>
+                    <span className="demo-pct-val">{getPercent(demoVotes.hybrid)}%</span>
+                  </div>
+                </div>
+                <div className="demo-bar-track">
+                  <div
+                    className="demo-bar-fill demo-bar-coral"
+                    style={{ width: `${getPercent(demoVotes.hybrid)}%` }}
+                  />
+                </div>
+              </button>
+
+              {/* Option 2 */}
+              <button
+                type="button"
+                onClick={() => handleDemoVote('remote')}
+                disabled={Boolean(demoSelected)}
+                className={`demo-option-item ${demoSelected === 'remote' ? 'voted' : ''} ${
+                  demoLastVoted === 'remote' ? 'flash-tick' : ''
+                }`}
+              >
+                <div className="demo-option-row">
+                  <div className="demo-option-label">
+                    <span className="demo-option-number">02</span>
+                    <span className="demo-option-text">Fully Remote (Work from anywhere)</span>
+                    {demoSelected === 'remote' && <span className="demo-vote-pill">Your Vote</span>}
+                  </div>
+                  <div className="demo-option-stats">
+                    <span className="demo-count-val">{demoVotes.remote} votes</span>
+                    <span className="demo-pct-val">{getPercent(demoVotes.remote)}%</span>
+                  </div>
+                </div>
+                <div className="demo-bar-track">
+                  <div
+                    className="demo-bar-fill demo-bar-mint"
+                    style={{ width: `${getPercent(demoVotes.remote)}%` }}
+                  />
+                </div>
+              </button>
+
+              {/* Option 3 */}
+              <button
+                type="button"
+                onClick={() => handleDemoVote('office')}
+                disabled={Boolean(demoSelected)}
+                className={`demo-option-item ${demoSelected === 'office' ? 'voted' : ''} ${
+                  demoLastVoted === 'office' ? 'flash-tick' : ''
+                }`}
+              >
+                <div className="demo-option-row">
+                  <div className="demo-option-label">
+                    <span className="demo-option-number">03</span>
+                    <span className="demo-option-text">In-Person First (Collaborative studio)</span>
+                    {demoSelected === 'office' && <span className="demo-vote-pill">Your Vote</span>}
+                  </div>
+                  <div className="demo-option-stats">
+                    <span className="demo-count-val">{demoVotes.office} votes</span>
+                    <span className="demo-pct-val">{getPercent(demoVotes.office)}%</span>
+                  </div>
+                </div>
+                <div className="demo-bar-track">
+                  <div
+                    className="demo-bar-fill demo-bar-navy"
+                    style={{ width: `${getPercent(demoVotes.office)}%` }}
+                  />
+                </div>
+              </button>
+            </div>
+
+            <div className="demo-card-footer">
+              <div className="demo-footer-info">
+                <span className="demo-live-dot" />
+                <span>Simulating live responses from audience</span>
+              </div>
+              <span className="demo-footer-total">
+                <strong>{demoTotal}</strong> participants voted
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Human Product Values Section */}
+      <section className="values-section">
+        <div className="values-container">
+          <div className="values-header">
+            <span className="section-eyebrow">Designed for Real Participation</span>
+            <h2 className="section-headline">Why people love using PulsePoll</h2>
+          </div>
+
+          <div className="values-grid">
+            <div className="value-card">
+              <div className="value-icon-box value-icon-coral">
+                <IconUsers size={22} />
+              </div>
+              <h3 className="value-title">Zero Friction for Voters</h3>
+              <p className="value-text">
+                Your audience joins via phone, tablet, or laptop in one tap. No accounts, no email forms, no app installs.
+              </p>
+            </div>
+
+            <div className="value-card">
+              <div className="value-icon-box value-icon-mint">
+                <IconRadio size={22} />
+              </div>
+              <h3 className="value-title">Instant Collective Energy</h3>
+              <p className="value-text">
+                Live result bars reveal audience opinions immediately. Perfect for company standups, classroom Q&As, and conference stages.
+              </p>
+            </div>
+
+            <div className="value-card">
+              <div className="value-icon-box value-icon-peach">
+                <IconShield size={22} />
+              </div>
+              <h3 className="value-title">Fair Single-Vote Integrity</h3>
+              <p className="value-text">
+                Smart session tokens and database-level unique constraints prevent duplicate submissions so your results stay authentic.
+              </p>
+            </div>
+
+            <div className="value-card">
+              <div className="value-icon-box value-icon-navy">
+                <IconSparkles size={22} />
+              </div>
+              <h3 className="value-title">Dual-Layer Reliability</h3>
+              <p className="value-text">
+                Permanent audit records in MongoDB combine with fast atomic Redis counters to ensure your data is always safe and responsive.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. Bottom Call to Action Banner — Deep Navy with Warm Coral */}
+      <section className="cta-banner-section">
+        <div className="cta-banner-card">
+          <div className="cta-banner-content">
+            <span className="cta-kicker">Get Started In Under 60 Seconds</span>
+            <h2 className="cta-title">Ready to hear what your audience thinks?</h2>
+            <p className="cta-subtext">
+              Create your first live poll for free. Ask a question, share the link, and see real-time answers unfold.
+            </p>
+            <div className="cta-action-row">
+              <Link to="/polls/create" className="btn btn-lg btn-primary hero-btn-coral">
+                <span>Create a Live Poll Now</span>
                 <IconArrowRight size={18} />
               </Link>
-              <a href="#live-demo" className="btn btn-lg btn-secondary hero-secondary-btn">
-                <span>Explore Live Demo</span>
-              </a>
-            </>
-          )}
-        </div>
-      </section>
-
-      {/* Realtime Live Interactive Demo Section */}
-      <section id="live-demo" className="demo-showcase-section">
-        <div className="demo-showcase-card">
-          <div className="demo-header-bar">
-            <div className="demo-badge-group">
-              <span className="demo-live-badge">
-                <span className="live-ping-dot" />
-                <span>LIVE NOW</span>
-              </span>
-              <span className="demo-label-pill">Interactive Product Preview</span>
             </div>
-            <span className="demo-hint-text">
-              {demoSelected ? '✓ Your sample response recorded' : 'Click any option to test voting'}
-            </span>
-          </div>
-
-          <div className="demo-content">
-            <h2 className="demo-question">What should our team build next?</h2>
-
-            <div className="demo-options-container" role="radiogroup" aria-label="Sample poll choices">
-              {/* Option 1: Go */}
-              <button
-                type="button"
-                onClick={() => handleDemoVote('go')}
-                disabled={Boolean(demoSelected)}
-                className={`demo-option-card ${demoSelected === 'go' ? 'selected' : ''} ${
-                  demoLastVoted === 'go' ? 'flash-update' : ''
-                }`}
-              >
-                <div className="demo-option-header">
-                  <div className="demo-option-left">
-                    <span className="demo-radio-circle">
-                      {demoSelected === 'go' && <span className="demo-radio-dot" />}
-                    </span>
-                    <span className="demo-option-name">Go Microservice Engine</span>
-                    {demoSelected === 'go' && <span className="demo-vote-chip">Your Choice</span>}
-                  </div>
-                  <div className="demo-option-right">
-                    <span className="demo-vote-count">{demoVotes.go} votes</span>
-                    <span className="demo-percentage">{getPercent(demoVotes.go)}%</span>
-                  </div>
-                </div>
-                <div className="demo-progress-track">
-                  <div
-                    className="demo-progress-fill demo-fill-primary"
-                    style={{ width: `${getPercent(demoVotes.go)}%` }}
-                  />
-                </div>
-              </button>
-
-              {/* Option 2: Rust */}
-              <button
-                type="button"
-                onClick={() => handleDemoVote('rust')}
-                disabled={Boolean(demoSelected)}
-                className={`demo-option-card ${demoSelected === 'rust' ? 'selected' : ''} ${
-                  demoLastVoted === 'rust' ? 'flash-update' : ''
-                }`}
-              >
-                <div className="demo-option-header">
-                  <div className="demo-option-left">
-                    <span className="demo-radio-circle">
-                      {demoSelected === 'rust' && <span className="demo-radio-dot" />}
-                    </span>
-                    <span className="demo-option-name">Rust High-Performance Worker</span>
-                    {demoSelected === 'rust' && <span className="demo-vote-chip">Your Choice</span>}
-                  </div>
-                  <div className="demo-option-right">
-                    <span className="demo-vote-count">{demoVotes.rust} votes</span>
-                    <span className="demo-percentage">{getPercent(demoVotes.rust)}%</span>
-                  </div>
-                </div>
-                <div className="demo-progress-track">
-                  <div
-                    className="demo-progress-fill demo-fill-secondary"
-                    style={{ width: `${getPercent(demoVotes.rust)}%` }}
-                  />
-                </div>
-              </button>
-
-              {/* Option 3: Python */}
-              <button
-                type="button"
-                onClick={() => handleDemoVote('python')}
-                disabled={Boolean(demoSelected)}
-                className={`demo-option-card ${demoSelected === 'python' ? 'selected' : ''} ${
-                  demoLastVoted === 'python' ? 'flash-update' : ''
-                }`}
-              >
-                <div className="demo-option-header">
-                  <div className="demo-option-left">
-                    <span className="demo-radio-circle">
-                      {demoSelected === 'python' && <span className="demo-radio-dot" />}
-                    </span>
-                    <span className="demo-option-name">Python Analytics Pipeline</span>
-                    {demoSelected === 'python' && <span className="demo-vote-chip">Your Choice</span>}
-                  </div>
-                  <div className="demo-option-right">
-                    <span className="demo-vote-count">{demoVotes.python} votes</span>
-                    <span className="demo-percentage">{getPercent(demoVotes.python)}%</span>
-                  </div>
-                </div>
-                <div className="demo-progress-track">
-                  <div
-                    className="demo-progress-fill demo-fill-tertiary"
-                    style={{ width: `${getPercent(demoVotes.python)}%` }}
-                  />
-                </div>
-              </button>
-            </div>
-
-            <div className="demo-footer-bar">
-              <div className="demo-live-status">
-                <span className="status-live-indicator" />
-                <span className="status-live-label">Results updating live</span>
-              </div>
-              <span className="demo-total-count">
-                <strong>{demoTotal}</strong> total responses
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How it Works: 3 Simple Steps */}
-      <section className="workflow-steps-section">
-        <div className="section-header-centered">
-          <span className="section-overhead-pill">Frictionless Workflow</span>
-          <h2 className="section-main-heading">From question to live results in three steps</h2>
-        </div>
-
-        <div className="steps-grid">
-          <div className="step-card">
-            <span className="step-number-tag">01</span>
-            <h3 className="step-card-title">Create your poll</h3>
-            <p className="step-card-desc">
-              Define your question, add up to 10 choices, and optionally schedule an automatic closing deadline.
-            </p>
-          </div>
-
-          <div className="step-card">
-            <span className="step-number-tag">02</span>
-            <h3 className="step-card-title">Share the link</h3>
-            <p className="step-card-desc">
-              Distribute a clean URL or display it on a presentation screen. Audiences can vote instantly with zero login.
-            </p>
-          </div>
-
-          <div className="step-card">
-            <span className="step-number-tag">03</span>
-            <h3 className="step-card-title">Watch responses live</h3>
-            <p className="step-card-desc">
-              Vote tallies, percentages, and leading choices animate in realtime via dedicated WebSocket streaming.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Core Features Grid */}
-      <section className="features-grid-section">
-        <div className="section-header-centered">
-          <span className="section-overhead-pill">Product Capabilities</span>
-          <h2 className="section-main-heading">Engineered for audience engagement</h2>
-        </div>
-
-        <div className="features-modern-grid">
-          <div className="feature-item-card">
-            <div className="feature-icon-box">
-              <IconRadio size={22} className="text-primary" />
-            </div>
-            <h3 className="feature-card-heading">Live Results</h3>
-            <p className="feature-card-body">
-              Persistent WebSocket channels broadcast aggregated vote updates to every connected screen sub-second.
-            </p>
-          </div>
-
-          <div className="feature-item-card">
-            <div className="feature-icon-box">
-              <IconActivity size={22} className="text-emerald" />
-            </div>
-            <h3 className="feature-card-heading">One-Click Sharing</h3>
-            <p className="feature-card-body">
-              Shareable public links adapt seamlessly to desktop browsers, mobile phones, and projector displays.
-            </p>
-          </div>
-
-          <div className="feature-item-card">
-            <div className="feature-icon-box">
-              <IconUsers size={22} className="text-indigo" />
-            </div>
-            <h3 className="feature-card-heading">Anonymous Audience Voting</h3>
-            <p className="feature-card-body">
-              Audience members vote with zero barrier to entry. No account registration or app installation required.
-            </p>
-          </div>
-
-          <div className="feature-item-card">
-            <div className="feature-icon-box">
-              <IconShield size={22} className="text-amber" />
-            </div>
-            <h3 className="feature-card-heading">Duplicate Vote Protection</h3>
-            <p className="feature-card-body">
-              Cryptographic voter tokens and database constraints prevent multiple submissions from the same device.
-            </p>
-          </div>
-
-          <div className="feature-item-card">
-            <div className="feature-icon-box">
-              <IconServer size={22} className="text-rose" />
-            </div>
-            <h3 className="feature-card-heading">Reliable Poll Management</h3>
-            <p className="feature-card-body">
-              Creators retain full lifecycle control with instantaneous close, question updates, and complete data deletion.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Compact Architecture Section */}
-      <section className="architecture-compact-section">
-        <div className="architecture-compact-box">
-          <div className="architecture-box-header">
-            <div className="arch-badge">BUILT FOR REALTIME</div>
-            <h2 className="arch-heading">High-concurrency infrastructure</h2>
-            <p className="arch-subtext">
-              Decoupled architecture separates durable audit persistence from sub-millisecond in-memory tallying.
-            </p>
-          </div>
-
-          <div className="architecture-stack-grid">
-            <div className="arch-stack-item">
-              <div className="arch-stack-header">
-                <IconDatabase size={20} className="arch-icon text-emerald" />
-                <span className="arch-stack-name">MongoDB</span>
-              </div>
-              <span className="arch-stack-role">Durable vote records</span>
-              <p className="arch-stack-desc">
-                Immutable audit trail with compound unique index guards against duplicate submissions.
-              </p>
-            </div>
-
-            <div className="arch-stack-item">
-              <div className="arch-stack-header">
-                <IconCpu size={20} className="arch-icon text-rose" />
-                <span className="arch-stack-name">Redis</span>
-              </div>
-              <span className="arch-stack-role">Atomic live counters</span>
-              <p className="arch-stack-desc">
-                High-throughput in-memory tallies and pub/sub message distribution without database write bottlenecks.
-              </p>
-            </div>
-
-            <div className="arch-stack-item">
-              <div className="arch-stack-header">
-                <IconRadio size={20} className="arch-icon text-indigo" />
-                <span className="arch-stack-name">WebSockets</span>
-              </div>
-              <span className="arch-stack-role">Instant updates</span>
-              <p className="arch-stack-desc">
-                Persistent bidirectional connections push real-time broadcasts to all active viewers with automatic reconnection.
-              </p>
-            </div>
-
-            <div className="arch-stack-item">
-              <div className="arch-stack-header">
-                <IconServer size={20} className="arch-icon text-cyan" />
-                <span className="arch-stack-name">Go & Gin</span>
-              </div>
-              <span className="arch-stack-role">High-concurrency API</span>
-              <p className="arch-stack-desc">
-                Lightweight goroutines handle thousands of concurrent voting requests with sub-millisecond execution times.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Bottom CTA Banner */}
-      <section className="bottom-cta-banner">
-        <div className="bottom-cta-content">
-          <h2 className="bottom-cta-title">Ready to engage your audience?</h2>
-          <p className="bottom-cta-desc">
-            Set up your first live poll in less than a minute. No credit card required.
-          </p>
-          <div className="bottom-cta-actions">
-            <Link to={isAuthenticated ? '/polls/create' : '/register'} className="btn btn-lg btn-primary">
-              <span>Get Started Now</span>
-              <IconArrowRight size={18} />
-            </Link>
           </div>
         </div>
       </section>

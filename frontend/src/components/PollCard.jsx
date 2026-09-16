@@ -34,7 +34,7 @@ export function PollCard({ poll, onDelete }) {
         <div className="poll-card-badge-group">
           <span className={`badge ${isClosed ? 'badge-closed' : isExpired ? 'badge-expired' : 'badge-active'}`}>
             <span className="badge-dot" />
-            {isClosed ? 'Closed' : isExpired ? 'Expired' : 'Active'}
+            {isClosed ? 'Voting Closed' : isExpired ? 'Expired' : 'Active'}
           </span>
           <span className="options-count-pill">
             {poll.options?.length || 0} options
@@ -49,6 +49,20 @@ export function PollCard({ poll, onDelete }) {
         </Link>
       </h3>
 
+      {/* Option preview chips */}
+      {poll.options && poll.options.length > 0 && (
+        <div className="poll-card-options-preview">
+          {poll.options.slice(0, 3).map((opt, i) => (
+            <span key={opt.id || i} className="poll-option-tag">
+              {opt.text}
+            </span>
+          ))}
+          {poll.options.length > 3 && (
+            <span className="poll-option-tag-more">+{poll.options.length - 3} more</span>
+          )}
+        </div>
+      )}
+
       <div className="poll-card-actions">
         <button
           type="button"
@@ -59,8 +73,8 @@ export function PollCard({ poll, onDelete }) {
         >
           {copied ? (
             <>
-              <IconCheck size={14} className="text-emerald" />
-              <span>Copied!</span>
+              <IconCheck size={14} className="text-mint" />
+              <span>Copied Link</span>
             </>
           ) : (
             <>
@@ -76,7 +90,7 @@ export function PollCard({ poll, onDelete }) {
           title="Open live public voting view"
         >
           <IconExternalLink size={14} />
-          <span>View Live</span>
+          <span>Public View</span>
         </Link>
 
         <Link

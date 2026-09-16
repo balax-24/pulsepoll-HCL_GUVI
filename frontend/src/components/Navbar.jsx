@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
-import { IconActivity, IconPlus, IconX } from './Icons.jsx'
+import { LogoMark } from './LogoMark.jsx'
+import { IconPlus, IconX } from './Icons.jsx'
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth()
@@ -20,11 +21,9 @@ export function Navbar() {
   return (
     <header className="navbar-container">
       <div className="navbar-content">
-        {/* Brand */}
+        {/* Brand Lockup */}
         <Link to="/" className="navbar-brand" onClick={() => setMobileMenuOpen(false)}>
-          <span className="brand-logo-mark">
-            <IconActivity className="brand-pulse-icon" size={18} />
-          </span>
+          <LogoMark size={32} variant="coral" className="brand-logo-mark" />
           <span className="brand-wordmark">
             Pulse<span className="brand-wordmark-accent">Poll</span>
           </span>
@@ -40,7 +39,7 @@ export function Navbar() {
             Home
           </Link>
 
-          {isAuthenticated && (
+          {isAuthenticated ? (
             <>
               <Link
                 to="/dashboard"
@@ -52,14 +51,18 @@ export function Navbar() {
                 to="/polls/create"
                 className={`nav-link nav-link-highlight ${isActive('/polls/create') ? 'active' : ''}`}
               >
-                <IconPlus size={14} className="nav-link-icon" />
+                <IconPlus size={15} className="nav-link-icon" />
                 <span>Create Poll</span>
               </Link>
             </>
+          ) : (
+            <a href="#how-it-works" className="nav-link">
+              How It Works
+            </a>
           )}
         </nav>
 
-        {/* Desktop Auth / User Action Area */}
+        {/* Desktop Auth / Action Area */}
         <div className="navbar-actions">
           {isAuthenticated ? (
             <div className="user-profile-menu">
@@ -84,7 +87,7 @@ export function Navbar() {
                 Sign In
               </Link>
               <Link to="/register" className="btn btn-sm btn-primary">
-                Get Started
+                Create a Poll
               </Link>
             </div>
           )}
@@ -163,7 +166,7 @@ export function Navbar() {
                   className="btn btn-sm btn-primary mobile-btn"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Get Started
+                  Create a Poll
                 </Link>
               </div>
             )}

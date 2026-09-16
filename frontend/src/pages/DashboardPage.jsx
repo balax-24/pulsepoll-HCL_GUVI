@@ -65,10 +65,10 @@ export function DashboardPage() {
         <div className="dashboard-title-group">
           <div className="dashboard-pretitle">
             <span className="dashboard-status-dot" />
-            <span>Workspace</span>
+            <span>Creator Workspace</span>
           </div>
           <h1 className="dashboard-title">
-            {user?.name ? `${user.name}'s Polls` : 'Creator Dashboard'}
+            {user?.name ? `${user.name}'s Polls` : 'My Polls'}
           </h1>
           <p className="dashboard-subtitle">
             Create questions, distribute shareable links, and monitor live responses.
@@ -100,7 +100,7 @@ export function DashboardPage() {
         />
       )}
 
-      {/* Metrics Row */}
+      {/* Meaningful Metrics Overview */}
       <div className="metrics-grid">
         <div className="metric-card">
           <div className="metric-header-row">
@@ -108,16 +108,16 @@ export function DashboardPage() {
             <IconBarChart size={16} className="text-muted" />
           </div>
           <span className="metric-value">{loading ? '—' : totalCount}</span>
-          <span className="metric-subtext">Registered in your account</span>
+          <span className="metric-subtext">Created in your account</span>
         </div>
 
         <div className="metric-card metric-card-active">
           <div className="metric-header-row">
             <span className="metric-label">Active Polls</span>
-            <IconActivity size={16} className="text-emerald" />
+            <IconActivity size={16} className="text-mint" />
           </div>
-          <span className="metric-value text-emerald">{loading ? '—' : activePollsCount}</span>
-          <span className="metric-subtext">Currently receiving responses</span>
+          <span className="metric-value text-mint">{loading ? '—' : activePollsCount}</span>
+          <span className="metric-subtext">Accepting live audience votes</span>
         </div>
 
         <div className="metric-card metric-card-closed">
@@ -126,7 +126,7 @@ export function DashboardPage() {
             <span className="badge-dot dot-gray" />
           </div>
           <span className="metric-value text-muted">{loading ? '—' : closedPollsCount}</span>
-          <span className="metric-subtext">Archived / final results</span>
+          <span className="metric-subtext">Archived final results</span>
         </div>
       </div>
 
@@ -183,25 +183,31 @@ export function DashboardPage() {
         </div>
       ) : filteredPolls.length === 0 ? (
         <div className="polls-empty-state">
-          <div className="empty-state-icon-wrapper">
-            <IconBarChart size={32} className="empty-icon text-muted" />
+          <div className="empty-state-visual-wrap">
+            <img
+              src="/images/empty-state.webp"
+              alt="No polls created yet"
+              className="empty-state-illustration"
+              width="240"
+              height="240"
+            />
           </div>
           {filter === 'all' ? (
             <>
-              <h2 className="empty-state-title">No polls yet</h2>
+              <h2 className="empty-state-title">No polls yet. Ask your first question.</h2>
               <p className="empty-state-desc">
-                Create your first poll and start collecting responses in real time.
+                Create a poll in seconds. Share the link with your audience and watch answers stream in live.
               </p>
               <Link to="/polls/create" className="btn btn-primary btn-empty-cta">
                 <IconPlus size={16} />
-                <span>Create Poll</span>
+                <span>Create Your First Poll</span>
               </Link>
             </>
           ) : (
             <>
               <h2 className="empty-state-title">No {filter} polls found</h2>
               <p className="empty-state-desc">
-                There are no polls currently matching the "{filter}" filter.
+                There are currently no polls matching the "{filter}" filter.
               </p>
               <button
                 type="button"
