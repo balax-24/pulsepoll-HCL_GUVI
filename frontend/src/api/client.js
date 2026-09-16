@@ -18,10 +18,11 @@ export const API_BASE_URL = cleanedBase.endsWith('/api')
   ? cleanedBase
   : `${cleanedBase}/api`
 
-// Compute WebSocket base URL (e.g. ws://localhost:8080/api)
-export const WS_BASE_URL = API_BASE_URL.replace(/^http(s)?:\/\//, (match, s) =>
-  s ? 'wss://' : 'ws://'
-)
+// Compute WebSocket base URL (e.g. ws://localhost:8080/api or wss://production-domain/api)
+// Automatically derives wss:// under https://, or respects explicit VITE_WS_URL
+export const WS_BASE_URL =
+  (import.meta.env.VITE_WS_URL && import.meta.env.VITE_WS_URL.trim()) ||
+  API_BASE_URL.replace(/^http(s)?:\/\//i, (match, s) => (s ? 'wss://' : 'ws://'))
 
 /**
  * Custom API Error class with normalized error code and user-friendly message

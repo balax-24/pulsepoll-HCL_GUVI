@@ -515,3 +515,113 @@ npm run build
    * Browser stores anonymous voter session tokens (`localStorage` and HTTP cookie).
    * Duplicate submissions are rejected with HTTP 409 `DUPLICATE_VOTE` and display a friendly message: *"You've already voted in this poll."*
    * When a creator closes a poll, a `poll_closed` frame is broadcast over WebSockets, instantly locking further voting across all screens.
+
+---
+
+## 11. Production Deployment Architecture
+
+PulsePoll provides complete production-grade deployment configurations supporting continuous integration, containerized packaging, and managed cloud environments.
+
+```
+                    [ React SPA (Vite / Nginx) ]
+                                 │
+                            HTTPS / WSS
+                                 │
+                                 ▼
+                     [ Go / Gin API Server ]
+                     (Docker: alpine:3.20)
+                       /               \
+                      /                 \
+                     ▼                   ▼
+           [ MongoDB Database ]   [ Redis In-Memory ]
+           (Durable Persistence)  ├── Live Counters (Hash)
+                                  └── Realtime Broker (Pub/Sub)
+                                           │
+                                           ▼
+                                [ Go WebSocket Broadcaster ]
+                                           │ (wss://)
+                                           ▼
+                                [ Active Browser Clients ]
+```
+
+### Component Roles in Production
+
+* **React Frontend**: Built as an optimized static SPA bundle and served via Nginx (or cloud CDN/static host). Configured with single-page application fallback (`try_files $uri $uri/ /index.html;` / rewrite `/*` to `/index.html`) ensuring direct navigation and browser refreshes on routes like `/polls/:id` or `/dashboard` never produce 404s.
+* **Go/Gin Backend**: Packaged in a minimal, multi-stage Docker container (`alpine:3.20`) running as an unprivileged user (`pulsepoll`). Provides REST API endpoints, payload validation, JWT authentication, and WebSocket connection upgrades.
+* **MongoDB**: Serves as the authoritative, durable database storing users, polls, options, and vote audit records. Configured with unique compound indexes (`poll_id` + `voter_id`) to enforce idempotency at the database level.
+* **Redis**: Decoupled into two distinct roles:
+  1. **Atomic Counters (`HINCRBY`)**: Authoritative in-memory cache holding real-time vote totals for instant retrieval without querying MongoDB.
+  2. **Pub/Sub Message Bus**: Distributes vote events and lifecycle notifications across server instances to connected WebSocket hubs.
+
+### HTTPS / WSS Protocol Resolution
+
+In production, frontend clients communicate exclusively over secure protocols:
+* **HTTP REST**: Automatically uses `https://<backend-domain>/api/...`
+* **WebSockets**: Automatically uses `wss://<backend-domain>/api/polls/:id/ws`
+
+The frontend client dynamically derives the WebSocket scheme from the base API URL:
+```javascript
+// Automatically derives wss:// under https://, or respects explicit VITE_WS_URL
+export const WS_BASE_URL =
+  (import.meta.env.VITE_WS_URL && import.meta.env.VITE_WS_URL.trim()) ||
+  API_BASE_URL.replace(/^http(s)?:\/\//i, (match, s) => (s ? 'wss://' : 'ws://'));
+```
+
+### Cross-Origin Security & Anonymous Voter Session Cookies
+
+When the frontend and backend are hosted on separate domains (e.g. `pulsepoll.onrender.com` and `pulsepoll-backend.onrender.com`):
+* **CORS**: The backend configures `cors.Config` with explicit origins from `ALLOWED_ORIGINS`, `AllowCredentials: true`, and exposes the `X-Voter-ID` header.
+* **Cookie Flags**: The anonymous voter session cookie (`pulsepoll_voter_id`) dynamically detects HTTPS (via direct TLS or `X-Forwarded-Proto: https`):
+  * **Production (HTTPS)**: `SameSite=None`, `Secure=true`, `HttpOnly=true`, `Path=/`
+  * **Development (HTTP)**: `SameSite=Lax`, `Secure=false`, `HttpOnly=true`, `Path=/`
+
+### Deployment Options
+
+#### Option A: Managed Cloud (Render + MongoDB Atlas + Managed Redis)
+
+PulsePoll includes a complete blueprint specification in `render.yaml`:
+1. Push repository to your GitHub account.
+2. In [MongoDB Atlas](https://www.mongodb.com/atlas), create a free M0 cluster and acquire the connection string:
+   ```
+   mongodb+srv://<username>:<password>@cluster0.mongodb.net/?retryWrites=true&w=majority
+   ```
+3. In [Render](https://render.com), create a new **Blueprint** instance pointing to your repository.
+4. Supply `MONGODB_URI` and `ALLOWED_ORIGINS` in the prompt; Render automatically provisions:
+   * **Backend**: Docker Web Service running the Go application with health checks on `/health`.
+   * **Frontend**: Static Site with automatic SPA rewrite (`/*` -> `/index.html`) and injected `VITE_API_BASE_URL`.
+   * **Redis**: Managed Redis instance with connection string linked directly to backend `REDIS_URL`.
+
+#### Option B: Self-Hosted Production Stack (Docker Compose)
+
+PulsePoll provides a fully isolated, production-tuned Docker Compose stack in `docker-compose.prod.yml`:
+```bash
+# Set your production JWT secret and origins
+export JWT_SECRET=$(openssl rand -base64 32)
+export ALLOWED_ORIGINS=https://your-domain.com
+
+# Launch production stack
+docker compose -f docker-compose.prod.yml up -d --build
+```
+This deploys:
+* `pulsepoll-mongo-prod`: MongoDB 7.0 container with persistent data volume `pulsepoll_mongodb_prod_data`.
+* `pulsepoll-redis-prod`: Redis 7.0 Alpine container with persistent AOF storage `pulsepoll_redis_prod_data`.
+* `pulsepoll-backend-prod`: Optimized static Go binary in Alpine image.
+* `pulsepoll-frontend-prod`: Nginx Alpine serving SPA with WebSocket reverse proxy on port 80/443.
+
+### Production Health Verification
+
+The backend exposes a health endpoint verifying database and cache connectivity:
+```bash
+curl -f https://<backend-domain>/api/health
+```
+**Expected Response (HTTP 200)**:
+```json
+{
+  "status": "healthy",
+  "services": {
+    "mongodb": "ok",
+    "redis": "ok"
+  },
+  "timestamp": "2026-09-16T06:00:00Z"
+}
+```

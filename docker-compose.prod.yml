@@ -1,0 +1,82 @@
+services:
+  pulsepoll-mongo:
+    image: mongo:7.0
+    container_name: pulsepoll-mongo-prod
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: pulsepoll
+    volumes:
+      - pulsepoll_mongodb_prod_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - pulsepoll-internal
+
+  pulsepoll-redis:
+    image: redis:7-alpine
+    container_name: pulsepoll-redis-prod
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - pulsepoll_redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 2s
+    networks:
+      - pulsepoll-internal
+
+  pulsepoll-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pulsepoll-backend-prod
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      ENV: "production"
+      MONGODB_URI: "mongodb://pulsepoll-mongo:27017"
+      MONGODB_DATABASE: "pulsepoll"
+      REDIS_URL: "redis://pulsepoll-redis:6379"
+      JWT_SECRET: "${JWT_SECRET:-pulsepoll-production-secret-key-replace-in-env-must-be-min-32-chars}"
+      JWT_EXPIRY_HOURS: "72"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost,http://localhost:80,http://localhost:5173,https://localhost}"
+    depends_on:
+      pulsepoll-mongo:
+        condition: service_healthy
+      pulsepoll-redis:
+        condition: service_healthy
+    networks:
+      - pulsepoll-internal
+
+  pulsepoll-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: "${VITE_API_BASE_URL:-}"
+        VITE_WS_URL: "${VITE_WS_URL:-}"
+    container_name: pulsepoll-frontend-prod
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - pulsepoll-backend
+    networks:
+      - pulsepoll-internal
+
+volumes:
+  pulsepoll_mongodb_prod_data:
+    name: pulsepoll_mongodb_prod_data
+  pulsepoll_redis_prod_data:
+    name: pulsepoll_redis_prod_data
+
+networks:
+  pulsepoll-internal:
+    name: pulsepoll-internal

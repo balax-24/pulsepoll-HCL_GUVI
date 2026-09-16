@@ -1,0 +1,54 @@
+services:
+  # 1. PulsePoll Go Backend & WebSocket Broadcaster
+  - type: web
+    name: pulsepoll-backend
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DATABASE
+        value: pulsepoll
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: pulsepoll-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRY_HOURS
+        value: 72
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  # 2. PulsePoll React Single-Page Application
+  - type: web
+    name: pulsepoll-frontend
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    plan: free
+    routes:
+      # SPA rewrite rule: direct navigation to /polls/:id or /dashboard serves index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: pulsepoll-backend
+          property: url
+
+  # 3. PulsePoll Managed Redis (Counters & Pub/Sub)
+  - type: redis
+    name: pulsepoll-redis
+    plan: free
+    ipAllowList: []
