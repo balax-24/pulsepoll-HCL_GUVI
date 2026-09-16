@@ -520,6 +520,18 @@ npm run build
 
 ## 11. Production Deployment Architecture
 
+PulsePoll is live and accessible on the public internet:
+
+| Component | Public URL / Endpoint | Provider |
+| :--- | :--- | :--- |
+| **Frontend Application** | [https://pulsepoll-frontend.onrender.com](https://pulsepoll-frontend.onrender.com) | Render (Static Site with SPA rewrite) |
+| **Backend REST API** | [https://pulsepoll-backend.onrender.com/api](https://pulsepoll-backend.onrender.com/api) | Render (Docker Web Service) |
+| **Health Check** | [https://pulsepoll-backend.onrender.com/api/health](https://pulsepoll-backend.onrender.com/api/health) | Render (`mongodb: ok, redis: ok`) |
+| **Realtime WebSocket** | `wss://pulsepoll-backend.onrender.com/api/polls/:id/ws` | Go / Gorilla WebSocket over WSS |
+| **Database** | MongoDB Atlas (Cluster0 M0) | MongoDB Cloud (Durable persistence) |
+| **Realtime Broker / Cache** | Render KeyValue (Redis 7) | Render (Atomic counters & Pub/Sub) |
+| **GitHub Repository** | [https://github.com/balax-24/pulsepoll-HCL_GUVI](https://github.com/balax-24/pulsepoll-HCL_GUVI) | GitHub (Public Repository) |
+
 PulsePoll provides complete production-grade deployment configurations supporting continuous integration, containerized packaging, and managed cloud environments.
 
 ```
