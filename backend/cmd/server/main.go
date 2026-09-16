@@ -15,6 +15,7 @@ import (
 	"pulsepoll/backend/internal/config"
 	"pulsepoll/backend/internal/database/mongodb"
 	"pulsepoll/backend/internal/database/redis"
+	"pulsepoll/backend/internal/polls"
 	"pulsepoll/backend/internal/server"
 )
 
@@ -71,13 +72,27 @@ func main() {
 	}
 	slog.Info("MongoDB user indexes verified")
 
-	// Initialize JWT manager, service, and HTTP handler
+	// Initialize Poll repository and ensure indexes
+	pollRepo := polls.NewMongoPollRepository(mongoClient.Database())
+	if err := pollRepo.EnsureIndexes(mongoCtx); err != nil {
+		slog.Error("Failed to ensure poll collection indexes", slog.String("error", err.Error()))
+		_ = redisClient.Close()
+		_ = mongoClient.Close(context.Background())
+		os.Exit(1)
+	}
+	slog.Info("MongoDB poll indexes verified")
+
+	// Initialize JWT manager, auth service, and HTTP handler
 	jwtMgr := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiryHours)
 	authService := auth.NewService(userRepo, jwtMgr)
 	authHandler := auth.NewHandler(authService)
 
+	// Initialize Polls service and HTTP handler
+	pollService := polls.NewService(pollRepo)
+	pollHandler := polls.NewHandler(pollService)
+
 	// Set up router and HTTP server
-	router := server.SetupRouter(cfg, mongoClient, redisClient, authHandler, jwtMgr)
+	router := server.SetupRouter(cfg, mongoClient, redisClient, authHandler, pollHandler, jwtMgr)
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),
 		Handler:      router,

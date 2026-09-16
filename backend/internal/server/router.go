@@ -9,6 +9,7 @@ import (
 	"pulsepoll/backend/internal/database/redis"
 	"pulsepoll/backend/internal/health"
 	"pulsepoll/backend/internal/middleware"
+	"pulsepoll/backend/internal/polls"
 	"pulsepoll/backend/internal/response"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,7 @@ func SetupRouter(
 	mongoClient *mongodb.Client,
 	redisClient *redis.Client,
 	authHandler *auth.Handler,
+	pollHandler *polls.Handler,
 	jwtMgr *auth.JWTManager,
 ) *gin.Engine {
 	if cfg.IsProduction() {
@@ -58,6 +60,27 @@ func SetupRouter(
 			authGroup.POST("/register", authHandler.Register)
 			authGroup.POST("/login", authHandler.Login)
 			authGroup.GET("/me", middleware.Authenticate(jwtMgr), authHandler.Me)
+		}
+
+		// Creator's polls endpoint: GET /api/my/polls
+		api.GET("/my/polls", middleware.Authenticate(jwtMgr), pollHandler.GetMyPolls)
+
+		// Polls group
+		pollsGroup := api.Group("/polls")
+		{
+			// Public audience endpoint: GET /api/polls/:id
+			pollsGroup.GET("/:id", pollHandler.GetPublic)
+
+			// Protected creator management endpoints
+			protected := pollsGroup.Group("")
+			protected.Use(middleware.Authenticate(jwtMgr))
+			{
+				protected.POST("", pollHandler.Create)
+				protected.PATCH("/:id", pollHandler.Update)
+				protected.PATCH("/:id/status", pollHandler.UpdateStatus)
+				protected.POST("/:id/close", pollHandler.Close)
+				protected.DELETE("/:id", pollHandler.Delete)
+			}
 		}
 	}
 
