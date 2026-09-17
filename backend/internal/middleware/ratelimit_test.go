@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -127,5 +128,64 @@ func TestRateLimiter_CapacityBounds(t *testing.T) {
 
 	if count > maxLimiterEntries {
 		t.Errorf("expected map entries <= %d, got %d", maxLimiterEntries, count)
+	}
+}
+
+func TestRateLimit_CloudflareTrustedPlatform_StableKey(t *testing.T) {
+	r := gin.New()
+	r.TrustedPlatform = gin.PlatformCloudflare
+	_ = r.SetTrustedProxies([]string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"})
+
+	// Matching production auth limiter: 5 requests/minute, burst 5
+	r.POST("/api/auth/login", RateLimit(5.0/60.0, 5), func(c *gin.Context) {
+		c.String(http.StatusOK, "OK")
+	})
+
+	const cfClientIP = "203.0.113.195"
+
+	// 5 requests within burst capacity from the same Cloudflare client IP
+	// Simulate rotating Anycast egress proxies in X-Forwarded-For and RemoteAddr
+	for i := 1; i <= 5; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+		req.Header.Set("CF-Connecting-IP", cfClientIP)
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("%s, 172.70.%d.1, 10.0.0.%d", cfClientIP, i, i))
+		req.RemoteAddr = fmt.Sprintf("10.0.0.%d:45678", i)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("request %d: expected HTTP 200, got %d", i, w.Code)
+		}
+	}
+
+	// 6th request from the same Cloudflare client must be rejected with 429 after burst is exhausted
+	req6 := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+	req6.Header.Set("CF-Connecting-IP", cfClientIP)
+	req6.Header.Set("X-Forwarded-For", fmt.Sprintf("%s, 172.70.99.1, 10.0.0.99", cfClientIP))
+	req6.RemoteAddr = "10.0.0.99:45678"
+
+	w6 := httptest.NewRecorder()
+	r.ServeHTTP(w6, req6)
+
+	if w6.Code != http.StatusTooManyRequests {
+		t.Fatalf("request 6: expected HTTP 429 after exhausting burst, got %d", w6.Code)
+	}
+
+	if retryAfter := w6.Header().Get("Retry-After"); retryAfter == "" {
+		t.Errorf("request 6: expected Retry-After header on 429 response")
+	}
+
+	// Request from a DIFFERENT Cloudflare client IP should succeed (isolated bucket)
+	reqOther := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
+	reqOther.Header.Set("CF-Connecting-IP", "198.51.100.42")
+	reqOther.Header.Set("X-Forwarded-For", "198.51.100.42, 172.70.1.1, 10.0.0.1")
+	reqOther.RemoteAddr = "10.0.0.1:45678"
+
+	wOther := httptest.NewRecorder()
+	r.ServeHTTP(wOther, reqOther)
+
+	if wOther.Code != http.StatusOK {
+		t.Fatalf("different client IP expected HTTP 200, got %d", wOther.Code)
 	}
 }

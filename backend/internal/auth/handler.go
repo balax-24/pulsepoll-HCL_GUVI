@@ -24,8 +24,7 @@ func NewHandler(service *Service) *Handler {
 // Register handles POST /api/auth/register.
 func (h *Handler) Register(c *gin.Context) {
 	var req RegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "INVALID_REQUEST_PAYLOAD", "Request body must contain name, email, and password")
+	if !response.BindJSON(c, &req, "Request body must contain name, email, and password") {
 		return
 	}
 
@@ -50,8 +49,7 @@ func (h *Handler) Register(c *gin.Context) {
 // Login handles POST /api/auth/login.
 func (h *Handler) Login(c *gin.Context) {
 	var req LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "INVALID_REQUEST_PAYLOAD", "Request body must contain email and password")
+	if !response.BindJSON(c, &req, "Request body must contain email and password") {
 		return
 	}
 

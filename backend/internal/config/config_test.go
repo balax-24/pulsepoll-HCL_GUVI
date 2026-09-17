@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
 
 func TestConfigValidation_Success(t *testing.T) {
@@ -235,6 +237,67 @@ func TestConfig_TrustedProxiesCustom(t *testing.T) {
 
 	if len(cfg.TrustedProxies) != 2 || cfg.TrustedProxies[0] != "192.168.1.0/24" || cfg.TrustedProxies[1] != "10.0.1.5" {
 		t.Errorf("expected custom trusted proxies, got %v", cfg.TrustedProxies)
+	}
+}
+
+func TestConfig_TrustedPlatform_ProductionDefault(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("PORT", "8080")
+	os.Setenv("ENV", "production")
+	os.Setenv("MONGODB_URI", "mongodb://localhost:27017")
+	os.Setenv("REDIS_URL", "redis://localhost:6379")
+	os.Setenv("JWT_SECRET", "production-jwt-secret-at-least-32-chars")
+	os.Setenv("ALLOWED_ORIGINS", "https://app.example.com")
+	defer os.Clearenv()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if cfg.TrustedPlatform != gin.PlatformCloudflare {
+		t.Errorf("expected production TrustedPlatform to default to %q, got %q", gin.PlatformCloudflare, cfg.TrustedPlatform)
+	}
+}
+
+func TestConfig_TrustedPlatform_DevelopmentDefault(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("PORT", "8080")
+	os.Setenv("ENV", "development")
+	os.Setenv("MONGODB_URI", "mongodb://localhost:27017")
+	os.Setenv("REDIS_URL", "redis://localhost:6379")
+	os.Setenv("JWT_SECRET", "dev-secret-32-characters-or-more-here")
+	os.Setenv("ALLOWED_ORIGINS", "http://localhost:5173")
+	defer os.Clearenv()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if cfg.TrustedPlatform != "" {
+		t.Errorf("expected development TrustedPlatform to default to empty string, got %q", cfg.TrustedPlatform)
+	}
+}
+
+func TestConfig_TrustedPlatform_Custom(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("PORT", "8080")
+	os.Setenv("ENV", "production")
+	os.Setenv("MONGODB_URI", "mongodb://localhost:27017")
+	os.Setenv("REDIS_URL", "redis://localhost:6379")
+	os.Setenv("JWT_SECRET", "production-jwt-secret-at-least-32-chars")
+	os.Setenv("ALLOWED_ORIGINS", "https://app.example.com")
+	os.Setenv("TRUSTED_PLATFORM", "X-Custom-IP-Header")
+	defer os.Clearenv()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if cfg.TrustedPlatform != "X-Custom-IP-Header" {
+		t.Errorf("expected custom TrustedPlatform %q, got %q", "X-Custom-IP-Header", cfg.TrustedPlatform)
 	}
 }
 

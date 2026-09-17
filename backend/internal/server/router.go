@@ -40,6 +40,14 @@ func SetupRouter(
 	// In development, defaults strictly to local loopback (127.0.0.1, ::1).
 	_ = r.SetTrustedProxies(cfg.TrustedProxies)
 
+	// In production behind Cloudflare, set TrustedPlatform to PlatformCloudflare ("CF-Connecting-IP")
+	// so ClientIP() uses the trusted client IP header from Cloudflare.
+	if cfg.TrustedPlatform != "" {
+		r.TrustedPlatform = cfg.TrustedPlatform
+	} else if cfg.IsProduction() {
+		r.TrustedPlatform = gin.PlatformCloudflare
+	}
+
 	// Global middleware
 	r.Use(middleware.Logger())
 	r.Use(middleware.Recovery())

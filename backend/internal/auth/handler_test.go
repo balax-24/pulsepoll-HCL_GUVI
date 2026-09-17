@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -178,5 +179,52 @@ func TestHandler_Login_And_Me(t *testing.T) {
 
 	if wUnauth.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 Unauthorized, got %d", wUnauth.Code)
+	}
+}
+
+func TestHandler_Register_MalformedPayloadReturns400(t *testing.T) {
+	r, _, _ := setupTestHTTPRouter()
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewBufferString(`{"invalid": json`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected HTTP 400 for malformed payload, got %d", w.Code)
+	}
+
+	var errResp response.ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp.Error.Code != "INVALID_REQUEST_PAYLOAD" {
+		t.Errorf("expected code INVALID_REQUEST_PAYLOAD, got %s", errResp.Error.Code)
+	}
+}
+
+func TestHandler_Register_OversizedPayloadReturns413(t *testing.T) {
+	r, _, _ := setupTestHTTPRouter()
+
+	w := httptest.NewRecorder()
+	// Simulate an incoming stream restricted by MaxBytesReader to 50 bytes
+	rawPayload := bytes.NewBufferString(`{"name":"A User With Too Much Data","email":"oversized@example.com","password":"SecretPassword123!"}`)
+	limitedBody := http.MaxBytesReader(w, io.NopCloser(rawPayload), 50)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", limitedBody)
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected HTTP 413 for oversized body, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var errResp response.ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if errResp.Error.Code != "PAYLOAD_TOO_LARGE" {
+		t.Errorf("expected code PAYLOAD_TOO_LARGE, got %s", errResp.Error.Code)
 	}
 }

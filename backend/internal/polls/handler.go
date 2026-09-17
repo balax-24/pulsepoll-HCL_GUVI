@@ -33,8 +33,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	var req CreatePollRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "INVALID_REQUEST_PAYLOAD", "Request body must include 'question' and 'options'")
+	if !response.BindJSON(c, &req, "Request body must include 'question' and 'options'") {
 		return
 	}
 
@@ -130,8 +129,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 
 	var req UpdatePollRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "INVALID_REQUEST_PAYLOAD", "Invalid JSON payload for poll update")
+	if !response.BindJSON(c, &req, "Invalid JSON payload for poll update") {
 		return
 	}
 
@@ -172,8 +170,7 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 	}
 
 	var req UpdateStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "INVALID_REQUEST_PAYLOAD", "Field 'status' must be specified ('active' or 'closed')")
+	if !response.BindJSON(c, &req, "Field 'status' must be specified ('active' or 'closed')") {
 		return
 	}
 

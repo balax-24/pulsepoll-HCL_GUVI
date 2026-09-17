@@ -8,20 +8,22 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
 // Config holds all backend configuration parameters.
 type Config struct {
-	Port           string
-	Env            string
-	MongoURI       string
-	MongoDBName    string
-	RedisURL       string
-	JWTSecret      string
-	JWTExpiryHours int
-	AllowedOrigins []string
-	TrustedProxies []string
+	Port            string
+	Env             string
+	MongoURI        string
+	MongoDBName     string
+	RedisURL        string
+	JWTSecret       string
+	JWTExpiryHours  int
+	AllowedOrigins  []string
+	TrustedProxies  []string
+	TrustedPlatform string
 }
 
 // Load reads configuration from environment variables and an optional .env file.
@@ -60,16 +62,22 @@ func Load() (*Config, error) {
 		trustedProxies = []string{"127.0.0.1", "::1"}
 	}
 
+	trustedPlatform := strings.TrimSpace(os.Getenv("TRUSTED_PLATFORM"))
+	if trustedPlatform == "" && strings.EqualFold(env, "production") {
+		trustedPlatform = gin.PlatformCloudflare
+	}
+
 	cfg := &Config{
-		Port:           port,
-		Env:            env,
-		MongoURI:       mongoURI,
-		MongoDBName:    mongoDBName,
-		RedisURL:       redisURL,
-		JWTSecret:      jwtSecret,
-		JWTExpiryHours: jwtExpiryHours,
-		AllowedOrigins: origins,
-		TrustedProxies: trustedProxies,
+		Port:            port,
+		Env:             env,
+		MongoURI:        mongoURI,
+		MongoDBName:     mongoDBName,
+		RedisURL:        redisURL,
+		JWTSecret:       jwtSecret,
+		JWTExpiryHours:  jwtExpiryHours,
+		AllowedOrigins:  origins,
+		TrustedProxies:  trustedProxies,
+		TrustedPlatform: trustedPlatform,
 	}
 
 	if err := cfg.Validate(); err != nil {

@@ -31,8 +31,7 @@ func (h *Handler) CastVote(c *gin.Context) {
 	}
 
 	var req CastVoteRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "INVALID_REQUEST_PAYLOAD", "Request body must include 'option_id'")
+	if !response.BindJSON(c, &req, "Request body must include 'option_id'") {
 		return
 	}
 
