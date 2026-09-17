@@ -356,6 +356,16 @@ func TestService_GetCreatorPolls(t *testing.T) {
 			t.Errorf("expected ErrForbidden, got %v", err)
 		}
 	})
+
+	t.Run("excessive page number capped to maxPage", func(t *testing.T) {
+		resp, err := svc.GetCreatorPolls(ctx, userA, 999999999, 10)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if resp.Page != 1000 {
+			t.Errorf("expected page capped to 1000, got %d", resp.Page)
+		}
+	})
 }
 
 func TestService_UpdatePoll(t *testing.T) {

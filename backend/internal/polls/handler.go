@@ -87,10 +87,15 @@ func (h *Handler) GetMyPolls(c *gin.Context) {
 		return
 	}
 
+	const maxPage = 1000
 	page := int64(1)
 	if pStr := c.Query("page"); pStr != "" {
 		if p, err := strconv.ParseInt(pStr, 10, 64); err == nil && p > 0 {
-			page = p
+			if p > maxPage {
+				page = maxPage
+			} else {
+				page = p
+			}
 		}
 	}
 

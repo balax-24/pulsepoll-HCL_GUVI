@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -80,6 +81,7 @@ func (r *RedisVoteRepository) GetOptionCounts(ctx context.Context, pollID string
 
 // InitializeCounters idempotently populates a poll's vote hash in Redis if not already present.
 // It sets all option IDs to their initial durable count (or 0) using HSETNX to avoid race-condition overwrites.
+// A 30-day TTL is applied to prevent unbounded memory growth from stale closed polls.
 func (r *RedisVoteRepository) InitializeCounters(ctx context.Context, pollID string, optionIDs []string, initialCounts map[string]int64) error {
 	key := pollVotesKey(pollID)
 
@@ -93,6 +95,8 @@ func (r *RedisVoteRepository) InitializeCounters(ctx context.Context, pollID str
 		}
 		pipe.HSetNX(ctx, key, optID, initVal)
 	}
+	// Expire stale poll counters after 30 days to prevent Redis OOM on free-tier.
+	pipe.Expire(ctx, key, 30*24*time.Hour)
 
 	_, err := pipe.Exec(ctx)
 	if err != nil {

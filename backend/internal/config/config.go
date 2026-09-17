@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ type Config struct {
 	JWTSecret      string
 	JWTExpiryHours int
 	AllowedOrigins []string
+	TrustedProxies []string
 }
 
 // Load reads configuration from environment variables and an optional .env file.
@@ -44,6 +46,20 @@ func Load() (*Config, error) {
 	originsRaw := getEnvOrDefault("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 	origins := parseOrigins(originsRaw)
 
+	trustedProxiesRaw := strings.TrimSpace(os.Getenv("TRUSTED_PROXIES"))
+	var trustedProxies []string
+	if trustedProxiesRaw != "" {
+		trustedProxies = parseOrigins(trustedProxiesRaw)
+	} else if strings.EqualFold(env, "production") {
+		// In production (Render / container orchestration), the reverse proxy
+		// connects over internal private subnets (RFC1918). Trusting loopback plus
+		// RFC1918 allows Gin to parse X-Forwarded-For and extract real client IPs.
+		trustedProxies = []string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
+	} else {
+		// In local development, only trust loopback
+		trustedProxies = []string{"127.0.0.1", "::1"}
+	}
+
 	cfg := &Config{
 		Port:           port,
 		Env:            env,
@@ -53,6 +69,7 @@ func Load() (*Config, error) {
 		JWTSecret:      jwtSecret,
 		JWTExpiryHours: jwtExpiryHours,
 		AllowedOrigins: origins,
+		TrustedProxies: trustedProxies,
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -91,6 +108,23 @@ func (c *Config) Validate() error {
 
 	if c.JWTExpiryHours <= 0 {
 		return errors.New("JWT_EXPIRY_HOURS must be greater than 0")
+	}
+
+	if len(c.TrustedProxies) == 0 {
+		c.TrustedProxies = []string{"127.0.0.1", "::1"}
+	}
+
+	// Enforce minimum JWT secret length to prevent brute-force attacks against HS256.
+	// Production: hard fail. Development: warn but allow startup.
+	const minJWTSecretLength = 32
+	if len(c.JWTSecret) < minJWTSecretLength {
+		if c.IsProduction() {
+			return fmt.Errorf("JWT_SECRET must be at least %d characters in production (got %d)", minJWTSecretLength, len(c.JWTSecret))
+		}
+		slog.Warn("JWT_SECRET is shorter than recommended minimum; acceptable for local development only",
+			slog.Int("length", len(c.JWTSecret)),
+			slog.Int("recommended_min", minJWTSecretLength),
+		)
 	}
 
 	return nil

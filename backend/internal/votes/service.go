@@ -159,6 +159,7 @@ func (s *Service) CastVote(ctx context.Context, pollID, optionID, voterID string
 		}
 
 		pubCtx, pubCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer pubCancel()
 		if pubErr := s.redisRepo.PublishVoteUpdate(pubCtx, pollID, event); pubErr != nil {
 			// Best-effort Pub/Sub delivery: Do NOT undo persisted vote.
 			// The Redis counter and MongoDB vote remain durable and authoritative.
@@ -175,7 +176,6 @@ func (s *Service) CastVote(ctx context.Context, pollID, optionID, voterID string
 				slog.Int64("total_votes", totalVotes),
 			)
 		}
-		pubCancel()
 	}
 
 	return &CastVoteResponse{

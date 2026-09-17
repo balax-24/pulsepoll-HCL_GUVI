@@ -239,6 +239,25 @@ func TestHandler_GetMyPolls(t *testing.T) {
 			t.Fatalf("expected 401 Unauthorized, got %d", w.Code)
 		}
 	})
+
+	t.Run("excessive page query parameter is capped at 1000", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/my/polls?page=999999999&limit=10", nil)
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tokenA))
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var listResp ListPollsResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &listResp); err != nil {
+			t.Fatalf("failed to decode list response: %v", err)
+		}
+		if listResp.Page != 1000 {
+			t.Errorf("expected page capped to 1000, got %d", listResp.Page)
+		}
+	})
 }
 
 func TestHandler_Ownership_Authorization(t *testing.T) {

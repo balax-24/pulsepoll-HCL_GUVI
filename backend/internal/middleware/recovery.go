@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 
 	"pulsepoll/backend/internal/response"
 
@@ -17,10 +18,12 @@ func Recovery() gin.HandlerFunc {
 		defer func() {
 			if r := recover(); r != nil {
 				errStr := fmt.Sprintf("%v", r)
+				stackTrace := string(debug.Stack())
 				slog.Error("Unhandled panic recovered in HTTP handler",
 					slog.String("error", errStr),
 					slog.String("path", c.Request.URL.Path),
 					slog.String("method", c.Request.Method),
+					slog.String("stack", stackTrace),
 				)
 
 				response.Error(

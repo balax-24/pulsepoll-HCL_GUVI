@@ -35,11 +35,16 @@ func SetupRouter(
 	}
 
 	r := gin.New()
-	_ = r.SetTrustedProxies([]string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"})
+	// Configure trusted reverse proxies from configuration.
+	// In production, trusts loopback plus RFC1918 private subnets used by container platforms (Render).
+	// In development, defaults strictly to local loopback (127.0.0.1, ::1).
+	_ = r.SetTrustedProxies(cfg.TrustedProxies)
 
 	// Global middleware
 	r.Use(middleware.Logger())
 	r.Use(middleware.Recovery())
+	r.Use(middleware.SecurityHeaders())
+	r.Use(middleware.RequestBodyLimit(2 << 20)) // 2 MB body limit defends against memory exhaustion
 	r.Use(middleware.CORS(cfg.AllowedOrigins))
 
 	// Custom 404 & 405 handlers conforming to standard error JSON envelope
@@ -59,8 +64,10 @@ func SetupRouter(
 	{
 		api.GET("/health", healthHandler.Check)
 
-		// Auth group
+		// Auth group — rate limited to prevent credential brute-force and registration spam.
+		// 5 requests per minute per IP with burst of 5 (covers legitimate login retries).
 		authGroup := api.Group("/auth")
+		authGroup.Use(middleware.RateLimit(5.0/60.0, 5))
 		{
 			authGroup.POST("/register", authHandler.Register)
 			authGroup.POST("/login", authHandler.Login)
@@ -76,7 +83,13 @@ func SetupRouter(
 			// Public audience endpoints: GET poll, GET results, POST vote, GET ws
 			pollsGroup.GET("/:id", pollHandler.GetPublic)
 			pollsGroup.GET("/:id/results", voteHandler.GetResults)
-			pollsGroup.POST("/:id/vote", voteHandler.CastVote)
+			// Vote endpoint — rate limited per IP + Poll ID to mitigate automated ballot stuffing
+			// while accommodating legitimate shared NAT environments (e.g. college Wi-Fi, offices, live audiences).
+			// 60 requests per minute with burst capacity of 30 per IP+poll.
+			voteRateLimiter := middleware.RateLimitWithKey(func(c *gin.Context) string {
+				return c.ClientIP() + ":" + c.Param("id")
+			}, 60.0/60.0, 30)
+			pollsGroup.POST("/:id/vote", voteRateLimiter, voteHandler.CastVote)
 			pollsGroup.GET("/:id/ws", wsHandler.ServeWS)
 
 			// Protected creator management endpoints

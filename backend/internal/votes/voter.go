@@ -3,6 +3,7 @@ package votes
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -24,8 +25,9 @@ const (
 func GenerateVoterID() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		// Extremely rare fallback: return pseudo-random timestamp-based string
-		return hex.EncodeToString([]byte("voter_session_fallback"))
+		// If the CSPRNG is broken, the process is in an undefined security state.
+		// All cryptographic operations (JWT, bcrypt) are also compromised.
+		panic(fmt.Sprintf("crypto/rand.Read failed: %v", err))
 	}
 	return hex.EncodeToString(b)
 }

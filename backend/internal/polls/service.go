@@ -109,8 +109,11 @@ func (s *Service) GetCreatorPolls(ctx context.Context, creatorID string, page, l
 		return nil, ErrForbidden
 	}
 
+	const maxPage = 1000
 	if page < 1 {
 		page = 1
+	} else if page > maxPage {
+		page = maxPage
 	}
 	if limit < 1 || limit > 100 {
 		limit = 20

@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -58,6 +59,7 @@ func (m *JWTManager) Generate(userID, email string) (string, error) {
 
 // Validate verifies the token signature and claims, ensuring it has not expired or been forged.
 func (m *JWTManager) Validate(tokenString string) (*CustomClaims, error) {
+	tokenString = strings.TrimSpace(tokenString)
 	if tokenString == "" {
 		return nil, errors.New("token string cannot be empty")
 	}
@@ -77,6 +79,16 @@ func (m *JWTManager) Validate(tokenString string) (*CustomClaims, error) {
 	claims, ok := token.Claims.(*CustomClaims)
 	if !ok || !token.Valid {
 		return nil, errors.New("invalid or expired token claims")
+	}
+
+	// Defense-in-depth: verify issuer matches pulsepoll
+	if claims.Issuer != "pulsepoll" {
+		return nil, errors.New("invalid token issuer")
+	}
+
+	// Defense-in-depth: verify subject claim exists and matches userID
+	if claims.Subject == "" || claims.Subject != claims.UserID {
+		return nil, errors.New("invalid token subject")
 	}
 
 	return claims, nil

@@ -120,11 +120,20 @@ func main() {
 	// Set up router and HTTP server
 	router := server.SetupRouter(cfg, mongoClient, redisClient, authHandler, pollHandler, voteHandler, wsHandler, jwtMgr)
 	httpServer := &http.Server{
-		Addr:         fmt.Sprintf(":%s", cfg.Port),
-		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		Addr:    fmt.Sprintf(":%s", cfg.Port),
+		Handler: router,
+		// ReadTimeout protects against slow-loris request attacks.
+		ReadTimeout: 15 * time.Second,
+		// ReadHeaderTimeout defends against slow header attacks.
+		ReadHeaderTimeout: 5 * time.Second,
+		// WriteTimeout is intentionally 0 (disabled) because this server hosts
+		// long-lived WebSocket connections. Per-write deadlines are enforced in
+		// websocket/client.go (writeWait = 10s) to protect against slow clients.
+		// A non-zero global WriteTimeout would kill idle WebSocket connections.
+		WriteTimeout: 0,
 		IdleTimeout:  60 * time.Second,
+		// MaxHeaderBytes prevents oversized-header denial-of-service attacks.
+		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
 	// Start HTTP server in a separate goroutine

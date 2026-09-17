@@ -98,3 +98,92 @@ func TestJWTForgedTampered(t *testing.T) {
 		t.Errorf("expected tampered token to fail validation")
 	}
 }
+
+func TestJWTEmptyOrWhitespaceToken(t *testing.T) {
+	mgr := NewJWTManager("secret-key-1234567890123456", 24)
+
+	for _, tc := range []string{"", "   ", "\t\n"} {
+		_, err := mgr.Validate(tc)
+		if err == nil {
+			t.Errorf("expected validation to fail for empty or whitespace token %q", tc)
+		}
+	}
+}
+
+func TestJWTInvalidIssuer(t *testing.T) {
+	secret := []byte("secret-key-1234567890123456")
+	claims := CustomClaims{
+		UserID: "u1",
+		Email:  "user@example.com",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "u1",
+			Issuer:    "malicious-foreign-issuer",
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+		},
+	}
+
+	tokenObj := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, err := tokenObj.SignedString(secret)
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	mgr := NewJWTManager(string(secret), 24)
+	_, err = mgr.Validate(tokenStr)
+	if err == nil {
+		t.Fatalf("expected validation to fail for non-pulsepoll issuer")
+	}
+}
+
+func TestJWTInvalidSubject(t *testing.T) {
+	secret := []byte("secret-key-1234567890123456")
+	claims := CustomClaims{
+		UserID: "u1",
+		Email:  "user@example.com",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "u2", // Mismatched subject vs UserID
+			Issuer:    "pulsepoll",
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+		},
+	}
+
+	tokenObj := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, err := tokenObj.SignedString(secret)
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	mgr := NewJWTManager(string(secret), 24)
+	_, err = mgr.Validate(tokenStr)
+	if err == nil {
+		t.Fatalf("expected validation to fail for mismatched subject")
+	}
+}
+
+func TestJWTWrongSigningAlgorithm(t *testing.T) {
+	// Attempt signing with "none" method
+	claims := CustomClaims{
+		UserID: "u1",
+		Email:  "user@example.com",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "u1",
+			Issuer:    "pulsepoll",
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+		},
+	}
+
+	tokenObj := jwt.NewWithClaims(jwt.SigningMethodNone, claims)
+	tokenStr, err := tokenObj.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	if err != nil {
+		t.Fatalf("failed to sign none token: %v", err)
+	}
+
+	mgr := NewJWTManager("secret-key-1234567890123456", 24)
+	_, err = mgr.Validate(tokenStr)
+	if err == nil {
+		t.Fatalf("expected validation to reject alg:none token")
+	}
+}
